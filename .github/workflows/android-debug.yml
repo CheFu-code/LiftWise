@@ -46,6 +46,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # expo-dev-client is already installed; a debug build includes its launcher.
+      # CI=1 makes prebuild non-interactive. Native projects are generated on the runner.
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+
       - name: Build Android development client
         working-directory: android
         run: |

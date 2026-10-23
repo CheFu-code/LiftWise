@@ -28,20 +28,19 @@ const GenderStep = ({ value, onSelect }: GenderStepProps) => {
   const primary = useAppThemeColor("primary");
 
   return (
-    <View className="flex-1">
+    <View className="w-full flex-1">
       <Animated.View entering={FadeInRight.duration(250)}>
         <Text
-          className="mt-6 max-w-72 font-inter-bold text-[28px] leading-9 
-        tracking-[-0.6px] text-foreground"
+          className="mt-6 w-full font-inter-bold text-[28px] leading-9 tracking-[-0.6px] text-foreground"
         >
           What&apos;s your gender?
         </Text>
-        <Text className="mt-2 max-w-72 font-inter text-[15px] leading-6 text-muted-foreground">
+        <Text className="mt-2 w-full font-inter text-[15px] leading-6 text-muted-foreground">
           This helps us personalize your experience.
         </Text>
       </Animated.View>
 
-      <View className="mt-8 gap-4">
+      <View className="mt-8 w-full gap-4">
         {genderOptions.map((option, index) => {
           const selected = value === option.value;
           return (
