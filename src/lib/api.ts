@@ -155,6 +155,41 @@ export async function getWorkoutQueryFn(id: string) {
   return data;
 }
 
+export async function reorderWorkoutExercisesMutationFn(
+  id: string,
+  exerciseIds: string[],
+) {
+  const { data, error } = await authenticatedFetch<{ success: boolean }>(
+    `${API_URL}/liftwise/workouts/${encodeURIComponent(id)}/exercise-order`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ exerciseIds }),
+    },
+  );
+  if (error || !data?.success)
+    throw new Error(error?.message || "Unable to save exercise order.");
+}
+
+export async function duplicateWorkoutMutationFn(id: string) {
+  const { data, error } = await authenticatedFetch<WorkoutDetail>(
+    `${API_URL}/liftwise/workouts/${encodeURIComponent(id)}/duplicate`,
+    { method: "POST" },
+  );
+  if (error || !data?.id)
+    throw new Error(error?.message || "Unable to duplicate workout.");
+  return data;
+}
+
+export async function deleteWorkoutMutationFn(id: string) {
+  const { data, error } = await authenticatedFetch<{ success: boolean }>(
+    `${API_URL}/liftwise/workouts/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+  if (error || !data?.success)
+    throw new Error(error?.message || "Unable to delete workout.");
+}
+
 export async function getExercisesQueryFn(search?: string) {
   const query = search ? `?search=${encodeURIComponent(search)}` : "";
   const { data, error } = await authenticatedFetch<ExerciseItem[]>(

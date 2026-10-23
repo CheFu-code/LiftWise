@@ -1,3 +1,4 @@
+import { useActionModal } from "@/components/ui/action-modal";
 import LoadingModal from "@/components/loading-modal";
 import Button from "@/components/ui/button";
 import EmptyState from "@/components/ui/empty-state";
@@ -17,7 +18,7 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import {
     KeyboardAwareScrollView,
     KeyboardToolbar,
@@ -30,6 +31,7 @@ const formatTime = (seconds: number) =>
 type Timer = ReturnType<typeof useWorkoutTimer>;
 
 const ActiveSessionPage = () => {
+    const showModal = useActionModal();
     const navigation = useNavigation();
     const queryClient = useQueryClient();
     const router = useRouter();
@@ -99,12 +101,12 @@ const ActiveSessionPage = () => {
             );
             return true;
         } catch {
-            Alert.alert("Could not save", "Check your connection");
+            showModal("Could not save", "Check your connection");
             return false;
         } finally {
             setIsSaving(false);
         }
-    }, [completed, queryClient, timer, workout]);
+    }, [completed, queryClient, timer, workout, showModal]);
 
     const saveSessionRef = useRef(saveSession);
 
@@ -130,22 +132,18 @@ const ActiveSessionPage = () => {
             };
 
             if (completed.length === 0) {
-                Alert.alert(
-                    "Leave workout?",
-                    "Your progress will not be saved",
-                    [
-                        {
-                            text: "Cancel",
-                            style: "cancel",
-                            onPress: resumeTimer,
-                        },
-                        { text: "Leave", style: "destructive", onPress: leave },
-                    ],
-                );
+                showModal("Leave workout?", "Your progress will not be saved", [
+                    {
+                        text: "Cancel",
+                        style: "cancel",
+                        onPress: resumeTimer,
+                    },
+                    { text: "Leave", style: "destructive", onPress: leave },
+                ]);
                 return;
             }
 
-            Alert.alert(
+            showModal(
                 "Save progress?",
                 `You completed ${completed.length} of ${totalSets} sets`,
                 [
@@ -162,13 +160,13 @@ const ActiveSessionPage = () => {
         });
 
         return unsubscribe;
-    }, [completed, navigation, totalSets]);
+    }, [completed, navigation, totalSets, showModal]);
 
     const finishWorkout = () => {
         const wasPaused = timer.isPaused;
         timer.pause();
 
-        Alert.alert(
+        showModal(
             "Finish Workout?",
             `${completed.length} of ${totalSets} sets completed`,
             [

@@ -1,11 +1,6 @@
+import { useActionModal } from "@/components/ui/action-modal";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import GenderStep from "@/components/onboarding/gender-step";
@@ -28,6 +23,7 @@ import {
 import { useAppThemeColor } from "@/theme/app-theme";
 
 export default function OnboardingStep() {
+  const showModal = useActionModal();
   const { step: key = "" } = useLocalSearchParams<{ step: string }>();
   const { session, saveOnboardingProfile, signOut } = useAuth();
   const router = useRouter();
@@ -69,7 +65,7 @@ export default function OnboardingStep() {
   const goBack = () => {
     if (index === 0)
       void signOut().catch(() =>
-        Alert.alert("Unable to sign out", "Please try again."),
+        showModal("Unable to sign out", "Please try again."),
       );
     else
       router.replace({
@@ -87,7 +83,7 @@ export default function OnboardingStep() {
     }
     const parsed = onboardingValuesSchema.safeParse(values);
     if (!parsed.success) {
-      Alert.alert("Complete your preferences", "Please answer each question.");
+      showModal("Complete your preferences", "Please answer each question.");
       return;
     }
     setSaving(true);
@@ -96,7 +92,7 @@ export default function OnboardingStep() {
       await clearOnboardingDraft(uid).catch(() => undefined);
       router.replace("/");
     } catch (error) {
-      Alert.alert(
+      showModal(
         "Unable to save preferences",
         error instanceof Error ? error.message : "Please try again.",
       );

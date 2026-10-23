@@ -1,4 +1,5 @@
 import { ChefuAuthProvider, useAuth } from "@/lib/chefu-auth";
+import { ActionModalProvider } from "@/components/ui/action-modal";
 import { getStatusBarStyle } from "@/lib/utils";
 import { appThemeColors, appThemes } from "@/theme/app-theme";
 import {
@@ -103,24 +104,26 @@ function RootNavigation() {
           {Platform.OS === "ios" && (
             <StatusBar animated style={statusBarStyle} />
           )}
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              //USE: Stack controls Android; expo-status-bar above controls iOS.
-              ...(Platform.OS === "android" && { statusBarStyle }),
-            }}
-          >
-            <Stack.Protected guard={!session}>
-              <Stack.Screen name="(public)" />
-            </Stack.Protected>
-            <Stack.Protected guard={!!session && isOnboardingComplete}>
-              <Stack.Screen name="(app)" />
-            </Stack.Protected>
-            <Stack.Protected guard={!!session && !isOnboardingComplete}>
-              <Stack.Screen name="onboarding" />
-            </Stack.Protected>
-            <Stack.Screen name="sso-callback" />
-          </Stack>
+          <ActionModalProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                //USE: Stack controls Android; expo-status-bar above controls iOS.
+                ...(Platform.OS === "android" && { statusBarStyle }),
+              }}
+            >
+              <Stack.Protected guard={!session}>
+                <Stack.Screen name="(public)" />
+              </Stack.Protected>
+              <Stack.Protected guard={!!session && isOnboardingComplete}>
+                <Stack.Screen name="(app)" />
+              </Stack.Protected>
+              <Stack.Protected guard={!!session && !isOnboardingComplete}>
+                <Stack.Screen name="onboarding" />
+              </Stack.Protected>
+              <Stack.Screen name="sso-callback" />
+            </Stack>
+          </ActionModalProvider>
         </View>
       </ThemeProvider>
     </KeyboardProvider>

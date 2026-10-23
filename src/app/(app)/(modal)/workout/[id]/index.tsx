@@ -1,17 +1,69 @@
+import WorkoutExerciseList from "@/components/workout-exercise-list";
 import Button from "@/components/ui/button";
 import EmptyState from "@/components/ui/empty-state";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Skeleton from "@/components/ui/skeleton";
-import { getWorkoutQueryFn } from "@/lib/api";
+import { useActionModal } from "@/components/ui/action-modal";
+import {
+    deleteWorkoutMutationFn,
+    duplicateWorkoutMutationFn,
+    getWorkoutQueryFn,
+    reorderWorkoutExercisesMutationFn,
+} from "@/lib/api";
 import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import {
+    ActivityIndicator,
+    BackHandler,
+    Platform,
+    StyleSheet,
+    useWindowDimensions,
+    Image,
+    Pressable,
+    ScrollView,
+    Text,
+    View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const Index = () => {
     const router = useRouter();
+    const showModal = useActionModal();
+    const queryClient = useQueryClient();
+    const [busy, setBusy] = useState(false);
+    const [dragging, setDragging] = useState(false);
+    const inFlight = useRef(false);
+    const screenRef = useRef<View>(null);
+    const menuButtonRef = useRef<View>(null);
+    const [menuTop, setMenuTop] = useState<number | null>(null);
+    const { width, height } = useWindowDimensions();
+    const foreground = useAppThemeColor("foreground");
+    const destructive = useAppThemeColor("destructive");
+    const menuOpen = menuTop !== null;
+
+    useEffect(() => {
+        setMenuTop(null);
+    }, [width, height]);
+    useEffect(() => {
+        if (!menuOpen) return;
+        const back = BackHandler.addEventListener("hardwareBackPress", () => {
+            setMenuTop(null);
+            return true;
+        });
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setMenuTop(null);
+        };
+        if (Platform.OS === "web")
+            document.addEventListener("keydown", onKeyDown);
+        return () => {
+            back.remove();
+            if (Platform.OS === "web")
+                document.removeEventListener("keydown", onKeyDown);
+        };
+    }, [menuOpen]);
     const { id } = useLocalSearchParams<{ id: string }>();
     const mutedForeground = useAppThemeColor("mutedForeground");
     const {
@@ -36,155 +88,318 @@ const Index = () => {
         { icon: "layers", label: `${totalSets} Sets` },
     ] as const;
 
+    const saveExerciseOrder = async (exerciseIds: string[]) => {
+        if (!workout || inFlight.current) return;
+        inFlight.current = true;
+        setBusy(true);
+        const queryKey = ["workouts", id];
+        try {
+            await queryClient.cancelQueries({ queryKey, exact: true });
+            const byId = new Map(
+                workout.exercises.map((exercise) => [exercise.id, exercise]),
+            );
+            queryClient.setQueryData(queryKey, {
+                ...workout,
+                exercises: exerciseIds.map((exerciseId) =>
+                    byId.get(exerciseId)!,
+                ),
+            });
+            await reorderWorkoutExercisesMutationFn(id, exerciseIds);
+        } catch (cause) {
+            queryClient.setQueryData(queryKey, workout);
+            showModal(
+                "Unable to save exercise order",
+                cause instanceof Error ? cause.message : "Please try again.",
+            );
+        } finally {
+            await queryClient.invalidateQueries({ queryKey, exact: true });
+            inFlight.current = false;
+            setBusy(false);
+        }
+    };
+
+    const runAction = async (action: "duplicate" | "delete") => {
+        if (!workout || inFlight.current) return;
+        inFlight.current = true;
+        setBusy(true);
+        try {
+            if (action === "duplicate") {
+                const copy = await duplicateWorkoutMutationFn(id);
+                await queryClient.invalidateQueries({ queryKey: ["workouts"] });
+                router.replace({
+                    pathname: "/workout/[id]",
+                    params: { id: copy.id },
+                });
+            } else {
+                await deleteWorkoutMutationFn(id);
+                await queryClient.cancelQueries({
+                    queryKey: ["workouts", id],
+                    exact: true,
+                });
+                router.replace("/workouts");
+                queryClient.removeQueries({
+                    queryKey: ["workouts", id],
+                    exact: true,
+                });
+                await queryClient.invalidateQueries({ queryKey: ["workouts"] });
+            }
+        } catch (cause) {
+            showModal(
+                action === "duplicate"
+                    ? "Unable to duplicate workout"
+                    : "Unable to delete workout",
+                cause instanceof Error ? cause.message : "Please try again.",
+            );
+        } finally {
+            inFlight.current = false;
+            setBusy(false);
+        }
+    };
+    const openActions = () => {
+        if (!workout || inFlight.current) return;
+        if (menuOpen) {
+            setMenuTop(null);
+            return;
+        }
+        if (screenRef.current)
+            menuButtonRef.current?.measureLayout(
+                screenRef.current,
+                (_x, y, _width, buttonHeight) =>
+                    setMenuTop(y + buttonHeight + 8),
+            );
+    };
+    const confirmDelete = () => {
+        setMenuTop(null);
+        if (!workout) return;
+        showModal(
+            "Delete workout?",
+            `Remove ?${workout.name}? from your workouts? Completed workout history will be kept.`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete workout",
+                    style: "destructive",
+                    onPress: () => runAction("delete"),
+                },
+            ],
+        );
+    };
+
     if (isPending) return <WorkoutDetailSkeleton />;
 
     return (
-        <SafeAreaScreen edges={["bottom"]}>
-            <ScrollView
-                className="flex-1"
-                contentContainerClassName="pb-8"
-                showsVerticalScrollIndicator={false}
+        <View ref={screenRef} collapsable={false} style={{ flex: 1 }}>
+            <SafeAreaScreen
+                edges={["bottom"]}
+                accessibilityElementsHidden={menuOpen}
+                importantForAccessibility={
+                    menuOpen ? "no-hide-descendants" : "auto"
+                }
             >
-                <View className="h-80 bg-muted">
-                    {workout?.image ? (
-                        <>
-                            <Image
-                                className="h-full w-full"
-                                resizeMode="cover"
-                                source={{ uri: workout.image }}
-                            />
-                            <View className="absolute inset-0 bg-black/20" />
-                        </>
+                <ScrollView
+                    className="flex-1"
+                    contentContainerClassName="pb-8"
+                    showsVerticalScrollIndicator={false}
+                    scrollEnabled={!dragging}
+                    onScrollBeginDrag={() => setMenuTop(null)}
+                >
+                    <View className="h-80 bg-muted">
+                        {workout?.image ? (
+                            <>
+                                <Image
+                                    className="h-full w-full"
+                                    resizeMode="cover"
+                                    source={{ uri: workout.image }}
+                                />
+                                <View className="absolute inset-0 bg-black/20" />
+                            </>
+                        ) : (
+                            <View className="h-full items-center justify-center bg-muted">
+                                <Feather
+                                    color={mutedForeground}
+                                    name="image"
+                                    size={40}
+                                />
+                            </View>
+                        )}
+                    </View>
+
+                    <SafeAreaView
+                        className="absolute inset-x-0 top-0"
+                        edges={["top"]}
+                    >
+                        <View className="h-14 flex-row items-center justify-between px-4">
+                            <Pressable
+                                className="h-11 w-11 items-center justify-center rounded-full bg-black/40 active:opacity-70"
+                                onPress={router.back}
+                            >
+                                <Feather
+                                    color="white"
+                                    name="arrow-left"
+                                    size={23}
+                                />
+                            </Pressable>
+                            <Pressable
+                                accessibilityRole="button"
+                                ref={menuButtonRef}
+                                accessibilityLabel="Workout actions"
+                                aria-haspopup="menu"
+                                accessibilityState={{
+                                    disabled: busy || !workout,
+                                    expanded: menuOpen,
+                                    busy,
+                                }}
+                                disabled={busy || dragging || !workout}
+                                onPress={openActions}
+                                className="h-11 w-11 items-center justify-center rounded-full bg-black/40 active:opacity-70"
+                            >
+                                {busy ? (
+                                    <ActivityIndicator color="white" />
+                                ) : (
+                                    <Feather
+                                        color="white"
+                                        name="more-horizontal"
+                                        size={23}
+                                    />
+                                )}
+                            </Pressable>
+                        </View>
+                    </SafeAreaView>
+
+                    {isError ? (
+                        <EmptyState
+                            message="Could not load this workout"
+                            onRetry={refetch}
+                        />
                     ) : (
-                        <View className="h-full items-center justify-center bg-muted">
-                            <Feather
-                                color={mutedForeground}
-                                name="image"
-                                size={40}
-                            />
+                        <View className="px-5">
+                            <Text className="mt-4 font-inter-bold text-[24px] text-foreground">
+                                {workout?.name}
+                            </Text>
+                            {Boolean(workout?.muscles) && (
+                                <Text className="mt-1 font-inter capitalize text-[13px] text-muted-foreground">
+                                    {workout?.muscles}
+                                </Text>
+                            )}
+
+                            <View className="mt-4 flex-row gap-5">
+                                {stats.map((stat) => (
+                                    <View
+                                        className="flex-row items-center gap-1.5"
+                                        key={stat.label}
+                                    >
+                                        <Feather
+                                            color={mutedForeground}
+                                            name={stat.icon}
+                                            size={14}
+                                        />
+                                        <Text className="font-inter text-[12px] text-muted-foreground">
+                                            {stat.label}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+
+                            <Button
+                                disabled={busy || dragging || !workout}
+                                className="mt-5"
+                                leftIcon={
+                                    <Feather
+                                        color="white"
+                                        name="play"
+                                        size={17}
+                                    />
+                                }
+                                onPress={() =>
+                                    router.push({
+                                        pathname: "/workout/[id]/active",
+                                        params: { id },
+                                    })
+                                }
+                            >
+                                Start Workout
+                            </Button>
+
+                            <View>
+                                <Text className="mb-3 mt-6 font-inter-bold text-[16px] text-foreground">
+                                    Exercises
+                                </Text>
+                                {exercises.length > 1 && (
+                                    <Text className="mb-3 font-inter text-[12px] text-muted-foreground">
+                                        Drag the handles to reorder. Changes save automatically.
+                                    </Text>
+                                )}
+                                {exercises.length === 0 ? (
+                                    <EmptyState
+                                        icon="activity"
+                                        message="No exercises in this workout"
+                                    />
+                                ) : (
+                                    <WorkoutExerciseList
+                                        exercises={exercises}
+                                        disabled={busy}
+                                        onReorder={(ids) => {
+                                            void saveExerciseOrder(ids);
+                                        }}
+                                        onDraggingChange={setDragging}
+                                    />
+                                )}
+                            </View>
                         </View>
                     )}
-                </View>
-
-                <SafeAreaView
-                    className="absolute inset-x-0 top-0"
-                    edges={["top"]}
-                >
-                    <View className="h-14 flex-row items-center justify-between px-4">
-                        <Pressable
-                            className="h-11 w-11 items-center justify-center rounded-full bg-black/40 active:opacity-70"
-                            onPress={router.back}
-                        >
-                            <Feather
-                                color="white"
-                                name="arrow-left"
-                                size={23}
-                            />
-                        </Pressable>
-                        <View className="h-11 w-11 items-center justify-center rounded-full bg-black/40">
-                            <Feather
-                                color="white"
-                                name="more-horizontal"
-                                size={23}
-                            />
-                        </View>
-                    </View>
-                </SafeAreaView>
-
-                {isError ? (
-                    <EmptyState
-                        message="Could not load this workout"
-                        onRetry={refetch}
+                </ScrollView>
+            </SafeAreaScreen>
+            {menuOpen && (
+                <View style={StyleSheet.absoluteFill}>
+                    <Pressable
+                        cssInterop={false}
+                        style={StyleSheet.absoluteFill}
+                        accessibilityRole="button"
+                        accessibilityLabel="Close workout actions"
+                        onPress={() => setMenuTop(null)}
                     />
-                ) : (
-                    <View className="px-5">
-                        <Text className="mt-4 font-inter-bold text-[24px] text-foreground">
-                            {workout?.name}
-                        </Text>
-                        {Boolean(workout?.muscles) && (
-                            <Text className="mt-1 font-inter capitalize text-[13px] text-muted-foreground">
-                                {workout?.muscles}
-                            </Text>
-                        )}
-
-                        <View className="mt-4 flex-row gap-5">
-                            {stats.map((stat) => (
-                                <View
-                                    className="flex-row items-center gap-1.5"
-                                    key={stat.label}
-                                >
-                                    <Feather
-                                        color={mutedForeground}
-                                        name={stat.icon}
-                                        size={14}
-                                    />
-                                    <Text className="font-inter text-[12px] text-muted-foreground">
-                                        {stat.label}
-                                    </Text>
-                                </View>
-                            ))}
-                        </View>
-
-                        <Button
-                            className="mt-5"
-                            leftIcon={
-                                <Feather color="white" name="play" size={17} />
-                            }
-                            onPress={() =>
-                                router.push({
-                                    pathname: "/workout/[id]/active",
-                                    params: { id },
-                                })
-                            }
+                    <View
+                        accessibilityRole="menu"
+                        accessibilityViewIsModal
+                        onAccessibilityEscape={() => setMenuTop(null)}
+                        className="absolute overflow-hidden rounded-xl border border-border bg-card shadow-lg"
+                        style={{
+                            top: menuTop,
+                            right: 16,
+                            width: Math.min(220, width - 32),
+                        }}
+                    >
+                        <Pressable
+                            accessibilityRole="menuitem"
+                            className="min-h-12 flex-row items-center gap-3 px-4 py-3 active:bg-muted"
+                            onPress={() => {
+                                setMenuTop(null);
+                                void runAction("duplicate");
+                            }}
                         >
-                            Start Workout
-                        </Button>
-
-                        <View>
-                            <Text className="mb-3 mt-6 font-inter-bold text-[16px] text-foreground">
-                                Exercises
+                            <Feather name="copy" size={18} color={foreground} />
+                            <Text className="flex-1 font-inter-medium text-[14px] text-foreground">
+                                Duplicate
                             </Text>
-                            {exercises.length === 0 ? (
-                                <EmptyState
-                                    icon="activity"
-                                    message="No exercises in this workout"
-                                />
-                            ) : (
-                                <View className="overflow-hidden rounded-xl border border-border bg-card">
-                                    {exercises.map((exercise, index) => (
-                                        <View
-                                            className="h-16 flex-row items-center border-b border-border px-4 last:border-b-0"
-                                            key={`${exercise.name}-${index}`}
-                                        >
-                                            <View className="h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                                                <Text className="font-inter-semibold text-[12px] text-muted-foreground">
-                                                    {index + 1}
-                                                </Text>
-                                            </View>
-                                            <View className="ml-3 flex-1">
-                                                <Text className="font-inter-semibold text-[13px] text-foreground">
-                                                    {exercise.name}
-                                                </Text>
-                                                <Text className="mt-1 font-inter text-[12px] text-muted-foreground">
-                                                    {exercise.sets} sets •{" "}
-                                                    {exercise.reps} reps •{" "}
-                                                    {exercise.rest}s rest
-                                                </Text>
-                                            </View>
-                                            <Feather
-                                                color={mutedForeground}
-                                                name="menu"
-                                                size={17}
-                                            />
-                                        </View>
-                                    ))}
-                                </View>
-                            )}
-                        </View>
+                        </Pressable>
+                        <Pressable
+                            accessibilityRole="menuitem"
+                            className="min-h-12 flex-row items-center gap-3 border-t border-border px-4 py-3 active:bg-muted"
+                            onPress={confirmDelete}
+                        >
+                            <Feather
+                                name="trash-2"
+                                size={18}
+                                color={destructive}
+                            />
+                            <Text className="flex-1 font-inter-medium text-[14px] text-destructive">
+                                Delete
+                            </Text>
+                        </Pressable>
                     </View>
-                )}
-            </ScrollView>
-        </SafeAreaScreen>
+                </View>
+            )}
+        </View>
     );
 };
 

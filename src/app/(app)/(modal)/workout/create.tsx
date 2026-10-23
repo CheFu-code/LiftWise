@@ -1,3 +1,4 @@
+import { useActionModal } from "@/components/ui/action-modal";
 import LoadingModal from "@/components/loading-modal";
 import Button from "@/components/ui/button";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
@@ -9,15 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import {
-  Alert,
-  Image,
-  Linking,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Image, Linking, Pressable, Text, TextInput, View } from "react-native";
 import {
   KeyboardAwareScrollView,
   KeyboardToolbar,
@@ -30,6 +23,7 @@ const formSchema = z.object({
 });
 
 const CreateWorkout = () => {
+  const showModal = useActionModal();
   const router = useRouter();
   const queryClient = useQueryClient();
   const muted = useAppThemeColor("mutedForeground");
@@ -57,7 +51,7 @@ const CreateWorkout = () => {
         })),
         image: coverImage?.base64,
       }),
-    onError: (error) => Alert.alert("Could not create workout", error.message),
+    onError: (error) => showModal("Could not create workout", error.message),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["workouts"] });
       setSelectedExercises([]);
@@ -88,7 +82,7 @@ const CreateWorkout = () => {
       name,
     });
     if (!result.success) {
-      Alert.alert("Missing details", result.error.issues[0].message);
+      showModal("Missing details", result.error.issues[0].message);
       return;
     }
     createMutation.mutate();
@@ -98,7 +92,7 @@ const CreateWorkout = () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert(
+      showModal(
         "Photo permission needed",
         "Allow photo access in Settings to choose a workout cover",
         [
@@ -170,7 +164,7 @@ const CreateWorkout = () => {
                 <>
                   <Feather color={muted} name="image" size={28} />
                   <Text className="mt-2 font-inter-medium text-[13px] text-muted-foreground">
-                    Choose Cover Image
+                    Choose cover image
                   </Text>
                 </>
               )}
@@ -309,7 +303,7 @@ const CreateWorkout = () => {
       <KeyboardToolbar />
 
       <LoadingModal
-        message="Saving workout.."
+        message="Saving workout..."
         visible={createMutation.isPending}
       />
     </SafeAreaScreen>

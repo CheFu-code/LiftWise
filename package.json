@@ -52,6 +52,8 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "test:workout-order": "node --test tests/workout-order.test.cjs",
+    "test:modal": "node --test tests/action-modal.test.cjs",
     "test:onboarding": "node --test tests/onboarding.test.cjs",
     "test:welcome": "node --test tests/welcome-layout.test.cjs",
     "test:auth": "node --test tests/chefu-auth.test.cjs",

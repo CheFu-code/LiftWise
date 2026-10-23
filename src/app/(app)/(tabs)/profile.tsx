@@ -1,5 +1,7 @@
+import { useActionModal } from "@/components/ui/action-modal";
 import { Feather } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import { useRouter } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
 import { useColorScheme } from "nativewind";
 import {
@@ -8,10 +10,11 @@ import {
     type ComponentProps,
     type ReactNode,
 } from "react";
-import { Alert, Image, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, Switch, Text, View } from "react-native";
 
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import { useAuth } from "@/lib/chefu-auth";
+import { onboardingValuesSchema } from "@/lib/validations/onboarding-validation";
 import { useAppThemeColor } from "@/theme/app-theme";
 
 const LEGAL_ORIGIN = "https://www.chefu.co.za";
@@ -21,8 +24,55 @@ const MY_ACCOUNT = "https://myaccount.chefu.co.za";
 const DELETE_ACCOUNT_URL = `${MY_ACCOUNT}/account?section=security`;
 
 export default function ProfilePage() {
-    //const router = useRouter();
-    const { session, signOut: signOutAccount } = useAuth();
+    const showModal = useActionModal();
+    const router = useRouter();
+    const {
+        session,
+        signOut: signOutAccount,
+        saveOnboardingProfile,
+    } = useAuth();
+    const [savingWeightUnit, setSavingWeightUnit] = useState(false);
+    const weightUnit = session?.onboardingProfile?.weightUnit ?? "kg";
+
+    const saveWeightUnit = async (unit: "kg" | "lb") => {
+        if (savingWeightUnit || unit === weightUnit) return;
+        const profile = onboardingValuesSchema.safeParse(
+            session?.onboardingProfile,
+        );
+        if (!profile.success) {
+            showModal(
+                "Unable to update weight unit",
+                "Please reload your profile and try again.",
+            );
+            return;
+        }
+        setSavingWeightUnit(true);
+        try {
+            await saveOnboardingProfile({ ...profile.data, weightUnit: unit });
+        } catch (error) {
+            showModal(
+                "Unable to save weight unit",
+                error instanceof Error ? error.message : "Please try again.",
+            );
+        } finally {
+            setSavingWeightUnit(false);
+        }
+    };
+
+    const chooseWeightUnit = () =>
+        showModal("Weight unit", "Choose your preferred unit.", [
+            {
+                text: "Kilograms (kg)",
+                selected: weightUnit === "kg",
+                onPress: () => saveWeightUnit("kg"),
+            },
+            {
+                text: "Pounds (lb)",
+                selected: weightUnit === "lb",
+                onPress: () => saveWeightUnit("lb"),
+            },
+            { text: "Cancel", style: "cancel" },
+        ]);
 
     const { colorScheme, setColorScheme } = useColorScheme();
     const primary = useAppThemeColor("primary");
@@ -46,13 +96,13 @@ export default function ProfilePage() {
         .join("")
         .slice(0, 2)
         .toUpperCase();
-    const soon = () => Alert.alert("Coming soon");
+    const soon = () => showModal("Coming soon");
 
     const signOut = async () => {
         try {
             await signOutAccount();
         } catch (error) {
-            Alert.alert(
+            showModal(
                 "Could not sign out",
                 error instanceof Error ? error.message : "Please try again.",
             );
@@ -107,8 +157,10 @@ export default function ProfilePage() {
                     <Row
                         icon="activity"
                         label="Weight Unit"
-                        onPress={soon}
-                        value="kg"
+                        onPress={
+                            savingWeightUnit ? undefined : chooseWeightUnit
+                        }
+                        value={savingWeightUnit ? "Saving…" : weightUnit}
                     />
                     <Row icon="bell" label="Notifications" onPress={soon} />
                     <Row
@@ -133,19 +185,25 @@ export default function ProfilePage() {
                     <Row
                         icon="help-circle"
                         label="Help & Support"
-                        onPress={soon}
+                        onPress={() => router.push("/help")}
                     />
                     <Row
                         icon="shield"
                         label="Privacy Policy"
+                        trailingIcon="external-link"
                         onPress={() => openBrowserAsync(PRIVACY_URL)}
                     />
                     <Row
                         icon="file-text"
                         label="Terms of Service"
+                        trailingIcon="external-link"
                         onPress={() => openBrowserAsync(TERMS_URL)}
                     />
-                    <Row icon="info" label="App Version" value={Constants.expoConfig?.version ?? "Unknown"} />
+                    <Row
+                        icon="info"
+                        label="App Version"
+                        value={Constants.expoConfig?.version ?? "Unknown"}
+                    />
                 </Section>
 
                 <Section title="Account">
