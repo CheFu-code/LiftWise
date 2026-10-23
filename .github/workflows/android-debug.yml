@@ -1,0 +1,81 @@
+name: Android Development Client
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-dev-client-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build development APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI: "1"
+      EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL || 'https://api.chefu.co.za' }}
+      EXPO_PUBLIC_ACCOUNT_APP_URL: ${{ vars.EXPO_PUBLIC_ACCOUNT_APP_URL || 'https://myaccount.chefu.co.za' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up Java and Gradle cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            package-lock.json
+            app.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Android development client
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug \
+            --no-daemon \
+            --max-workers=2 \
+            --stacktrace \
+            -PreactNativeArchitectures=arm64-v8a,x86_64
+
+      - name: Upload development APK
+        id: apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: liftwise-dev-client-${{ github.run_number }}
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Write installation instructions
+        env:
+          APK_ARTIFACT_URL: ${{ steps.apk.outputs.artifact-url }}
+        run: |
+          {
+            echo '### LiftWise Android development client'
+            printf '\n[Download the APK artifact](%s)\n\n' "$APK_ARTIFACT_URL"
+            echo '1. Extract the artifact ZIP and install the APK on your Android device or emulator.'
+            echo '2. In the LiftWise project, run `npx expo start --dev-client`.'
+            echo '3. Open the installed app and connect to your development server.'
+            echo ''
+            echo 'This debug APK uses the generated debug keystore and requires Metro to run the app.'
+          } >> "$GITHUB_STEP_SUMMARY"
