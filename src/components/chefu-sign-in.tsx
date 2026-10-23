@@ -1,9 +1,10 @@
 import Button from "@/components/ui/button";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import { useAuth } from "@/lib/chefu-auth";
+import { useAppThemeColor } from "@/theme/app-theme";
 import { Link } from "expo-router";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function ChefuSignIn({
   register = false,
@@ -11,6 +12,8 @@ export default function ChefuSignIn({
   register?: boolean;
 }) {
   const { signInWithChefuAccount, isAuthenticating } = useAuth();
+  const primary = useAppThemeColor("primary");
+  const mutedForeground = useAppThemeColor("mutedForeground");
   const [error, setError] = useState<string | null>(null);
   const signIn = async () => {
     setError(null);
@@ -47,18 +50,50 @@ export default function ChefuSignIn({
         >
           Continue to Sign {register ? "up" : "in"}
         </Button>
-        <Link
-          className="text-center text-primary"
-          href={register ? "/sign-in" : "/sign-up"}
-        >
-          {register
-            ? "Already have an account? Sign in"
-            : "New to LiftWise? Create an account"}
+        <Link href={register ? "/sign-in" : "/sign-up"} asChild>
+          <Pressable
+            cssInterop={false}
+            accessibilityRole="link"
+            style={styles.navigationLink}
+          >
+            <Text style={[styles.navigationText, { color: primary }]}>
+              {register
+                ? "Already have an account? Sign in"
+                : "New to LiftWise? Create an account"}
+            </Text>
+          </Pressable>
         </Link>
-        <Link className="text-center text-muted-foreground" href="/welcome">
-          Back to welcome
+        <Link href="/welcome" asChild>
+          <Pressable
+            cssInterop={false}
+            accessibilityRole="link"
+            style={styles.navigationLink}
+          >
+            <Text style={[styles.navigationText, { color: mutedForeground }]}>
+              Back to welcome
+            </Text>
+          </Pressable>
         </Link>
       </View>
     </SafeAreaScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  navigationLink: {
+    width: "100%",
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+  },
+  navigationText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    lineHeight: 24,
+    textAlign: "center",
+    flexShrink: 1,
+    width: "100%",
+  },
+});

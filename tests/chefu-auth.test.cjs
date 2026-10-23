@@ -78,13 +78,15 @@ test("concurrent requests refresh once and persist the rotated refresh token", a
     return refreshed();
   });
   await api.readSession();
-  await api.saveSession(expired());
+  const profile = { gender: "female", goal: "maintain", experience: "beginner" };
+  await api.saveSession({ ...expired(), onboardingProfile: profile });
   assert.deepEqual(
     await Promise.all([api.getToken(), api.getToken(), api.getToken()]),
     ["new", "new", "new"],
   );
   assert.equal(calls, 1);
   assert.equal(JSON.parse(stored()).refreshToken, "refresh-new");
+  assert.deepEqual(JSON.parse(stored()).onboardingProfile, profile);
 });
 
 test("a pending refresh cannot resurrect a signed-out session", async () => {
@@ -165,6 +167,13 @@ function signInFlow(result) {
       resetOnboardingAnswers() {},
     },
     "./auth-client": { API_URL: "http://localhost:8081" },
+    "./validations/onboarding-validation": {
+      onboardingValuesSchema: { safeParse: () => ({ success: false }) },
+    },
+    "./onboarding-profile": {
+      fetchOnboardingProfile: async () => ({ gender: "female" }),
+      postOnboardingProfile: async () => {},
+    },
     "./chefu-session": {
       CLIENT_ID: "liftwise-mobile",
       DISCOVERY: {},
@@ -173,8 +182,9 @@ function signInFlow(result) {
       subscribeSession() {},
       fetchUser: async () => ({ uid: "chefu-uid" }),
       sessionFromToken: () => ({ token: "new", user: { uid: "chefu-uid" } }),
-      saveSession: async () => {
+      saveSession: async (session) => {
         calls.save++;
+        calls.savedProfile = session.onboardingProfile;
       },
     },
   });
@@ -207,6 +217,7 @@ test("valid callbacks exchange the verifier and registration preserves the OAuth
   assert.equal(calls.request.redirectUri, "liftwise://sso-callback");
   assert.equal(calls.tokenOptions.extraParams.code_verifier, "secret-verifier");
   assert.equal(calls.save, 1);
+  assert.equal(calls.savedProfile.gender, "female");
   const url = new URL(calls.loginUrl);
   assert.equal(url.pathname, "/register");
   assert.equal(url.searchParams.get("app"), "liftwise");

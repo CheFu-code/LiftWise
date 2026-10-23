@@ -40,20 +40,20 @@ export default function ExperienceStep({
   const primary = useAppThemeColor("primary");
 
   return (
-    <View className="flex-1">
-      <Animated.View entering={FadeInRight.duration(250)}>
+    <View className="w-full flex-1">
+      <Animated.View style={{ width: "100%" }} entering={FadeInRight.duration(250)}>
         <Text
           accessibilityRole="header"
-          className="mt-6 max-w-80 font-inter-bold text-[28px] leading-9 tracking-[-0.6px] text-foreground"
+          className="mt-6 w-full font-inter-bold text-[28px] leading-9 tracking-[-0.6px] text-foreground"
         >
           What&apos;s your training experience?
         </Text>
-        <Text className="mt-2 max-w-72 font-inter text-[15px] leading-6 text-muted-foreground">
+        <Text className="mt-2 w-full font-inter text-[15px] leading-6 text-muted-foreground">
           Select your current experience level.
         </Text>
       </Animated.View>
 
-      <View accessibilityRole="radiogroup" className="mt-6 gap-4">
+      <View accessibilityRole="radiogroup" className="mt-6 w-full gap-4">
         {experienceOptions.map((option, index) => {
           const selected = value === option.value;
 

@@ -10,12 +10,12 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { onboardingValuesSchema } from "./validations/onboarding-validation";
 import {
-  getOnboardingAnswers,
-  resetOnboardingAnswers,
-} from "@/constants/onboarding";
+  fetchOnboardingProfile,
+  postOnboardingProfile,
+} from "./onboarding-profile";
 import type { ChefuAuthContextValue, ChefuAuthSession } from "@/types";
-import { API_URL } from "./auth-client";
 import {
   CLIENT_ID,
   DISCOVERY,
@@ -32,6 +32,22 @@ const ACCOUNT_URL =
   process.env.EXPO_PUBLIC_ACCOUNT_APP_URL || "https://myaccount.chefu.co.za";
 const ChefuAuthContext = createContext<ChefuAuthContextValue | null>(null);
 
+async function refreshOnboardingProfile() {
+  const token = await getToken();
+  if (!token) throw new Error("Please sign in again.");
+  const current = await readSession();
+  const onboardingProfile = await fetchOnboardingProfile(token);
+  const latest = await readSession();
+  if (
+    current &&
+    latest &&
+    latest.user.uid === current.user.uid &&
+    latest.onboardingProfile === current.onboardingProfile
+  )
+    await saveSession({ ...latest, onboardingProfile });
+  return onboardingProfile;
+}
+
 export function ChefuAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<ChefuAuthSession | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -41,7 +57,7 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     void readSession()
-      .then(() => getToken())
+      .then(refreshOnboardingProfile)
       .catch(() => undefined)
       .finally(() => {
         if (active) setIsLoaded(true);
@@ -60,6 +76,24 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
     isLoaded,
     isSignedIn: !!session,
     isAuthenticating,
+    isOnboardingComplete: onboardingValuesSchema.safeParse(
+      session?.onboardingProfile,
+    ).success,
+    refreshOnboardingProfile,
+    saveOnboardingProfile: async (values) => {
+      const token = await getToken();
+      if (!token) throw new Error("Please sign in again.");
+      const current = await readSession();
+      await postOnboardingProfile(token, values);
+      const onboardingProfile = await fetchOnboardingProfile(token);
+      const latest = await readSession();
+      if (current && latest && latest.user.uid === current.user.uid)
+        await saveSession({
+          ...latest,
+          onboardingProfile,
+          user: { ...latest.user, gender: onboardingProfile.gender },
+        });
+    },
     userId: session?.user.uid,
     session,
     user: session?.user ?? null,
@@ -121,22 +155,9 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
           token,
           await fetchUser(token.accessToken),
         );
-        const answers = getOnboardingAnswers();
-        if (answers.success) {
-          const response = await fetch(`${API_URL}/liftwise/profile`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${next.token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(answers.data),
-          });
-          if (!response.ok)
-            throw new Error(
-              "Unable to save your workout preferences. Please try again.",
-            );
-          resetOnboardingAnswers();
-        }
+        next.onboardingProfile = await fetchOnboardingProfile(
+          token.accessToken,
+        );
         await queryClient.cancelQueries();
         queryClient.clear();
         await saveSession(next);

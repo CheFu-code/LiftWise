@@ -24,12 +24,15 @@ const OnboardingOptionCard = ({
 }: OnboardingOptionCardProps) => {
   const primaryForeground = useAppThemeColor("primaryForeground");
   return (
-    <Animated.View entering={FadeInRight.delay(delay).duration(250)}>
+    <Animated.View
+      style={{ width: "100%" }}
+      entering={FadeInRight.delay(delay).duration(250)}
+    >
       <Pressable
         accessibilityRole="radio"
         accessibilityState={{ checked: selected }}
         className={cn(
-          "min-h-20 flex-row items-center rounded-xl border bg-card px-5 py-4",
+          "min-h-20 w-full flex-row items-center rounded-xl border bg-card px-5 py-4",
           selected ? "border-primary" : "border-border",
         )}
         onPress={onPress}

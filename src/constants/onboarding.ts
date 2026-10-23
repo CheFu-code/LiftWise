@@ -1,48 +1,59 @@
 import {
-    OnboardingValues,
-    onboardingValuesSchema,
+  onboardingValuesSchema,
+  type OnboardingValues,
 } from "@/lib/validations/onboarding-validation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
-
-const ONBOARDING_KEYS = "myworkout_onboarding_answers";
-export const answers: Partial<OnboardingValues> = {};
 
 export const steps = [
   { field: "gender", key: "gender" },
   { field: "goal", key: "goal" },
   { field: "experience", key: "experience" },
 ] as const;
-const isClient = Platform.OS !== "web" || typeof window !== "undefined";
 
-if (isClient) {
-  AsyncStorage.getItem(ONBOARDING_KEYS)
-    .then((data) => data && Object.assign(answers, JSON.parse(data)))
-    .catch(() => {});
+export function pendingOnboardingSteps(profile: Partial<OnboardingValues>) {
+  return steps.filter(
+    (step) =>
+      !onboardingValuesSchema.shape[step.field].safeParse(profile[step.field])
+        .success,
+  );
 }
 
-export const saveOnboardingAnswer = (
-  field: keyof OnboardingValues,
-  value: any,
-) => {
-  answers[field] = value;
-  if (isClient)
-    AsyncStorage.setItem(ONBOARDING_KEYS, JSON.stringify(answers)).catch(
-      () => {},
-    );
-};
+export function mergeOnboardingDraft(
+  profile: Partial<OnboardingValues>,
+  draft: Partial<OnboardingValues>,
+) {
+  return { ...draft, ...profile };
+}
 
-export const isOnboardingCompleted = (): boolean => {
-  return onboardingValuesSchema.safeParse(answers).success;
-};
+const key = (uid: string) => `liftwise_onboarding_${uid}`;
+let writes: Promise<unknown> = Promise.resolve();
 
-export const getOnboardingAnswers = () => {
-  return onboardingValuesSchema.safeParse(answers);
-};
+export async function readOnboardingDraft(
+  uid: string,
+): Promise<Partial<OnboardingValues>> {
+  await writes.catch(() => undefined);
+  const raw = await AsyncStorage.getItem(key(uid));
+  if (!raw) return {};
+  try {
+    return onboardingValuesSchema.partial().parse(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+}
 
-export const resetOnboardingAnswers = () => {
-  steps.forEach((s) => delete answers[s.field]);
-  if (isClient) AsyncStorage.removeItem(ONBOARDING_KEYS).catch(() => {});
-};
+export function saveOnboardingDraft(
+  uid: string,
+  values: Partial<OnboardingValues>,
+) {
+  writes = writes
+    .catch(() => undefined)
+    .then(() => AsyncStorage.setItem(key(uid), JSON.stringify(values)));
+  return writes;
+}
 
-export const stepIndex = (key: string) => steps.findIndex((s) => s.key === key);
+export async function clearOnboardingDraft(uid: string) {
+  writes = writes
+    .catch(() => undefined)
+    .then(() => AsyncStorage.removeItem(key(uid)));
+  await writes;
+}

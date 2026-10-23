@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const onboardingValuesSchema = z.object({
   experience: z.enum(["beginner", "intermediate", "advanced"]),
-  gender: z.enum(["male", "female"]),
+  // Reuse gender values collected by other apps through the shared account.
+  gender: z.string().trim().min(1).max(80),
   goal: z.enum(["build-muscle", "lose-fat", "maintain"]),
 });
 

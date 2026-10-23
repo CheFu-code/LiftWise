@@ -74,7 +74,7 @@ function RootNavigation() {
   // UPDATE: helper method to determine the style value
   const statusBarStyle = getStatusBarStyle(pathname, scheme);
 
-  const { session, isLoaded } = useAuth();
+  const { session, isLoaded, isOnboardingComplete } = useAuth();
   const isPending = !isLoaded;
 
   // check if font is loaded properly
@@ -113,8 +113,11 @@ function RootNavigation() {
             <Stack.Protected guard={!session}>
               <Stack.Screen name="(public)" />
             </Stack.Protected>
-            <Stack.Protected guard={!!session}>
+            <Stack.Protected guard={!!session && isOnboardingComplete}>
               <Stack.Screen name="(app)" />
+            </Stack.Protected>
+            <Stack.Protected guard={!!session && !isOnboardingComplete}>
+              <Stack.Screen name="onboarding" />
             </Stack.Protected>
             <Stack.Screen name="sso-callback" />
           </Stack>

@@ -106,6 +106,7 @@ export async function fetchUser(token: string): Promise<ChefuUser> {
     displayName: info.name || info.email,
     photoURL: info.picture || null,
     roles: info.roles,
+    gender: typeof info.gender === "string" ? info.gender : undefined,
   };
 }
 
@@ -127,6 +128,7 @@ export async function getToken(): Promise<string | null> {
       );
       if (current !== previous) return current?.token ?? null;
       await saveSession({
+        ...previous,
         ...sessionFromToken(token, previous.user),
         refreshToken: token.refreshToken || previous.refreshToken,
       });

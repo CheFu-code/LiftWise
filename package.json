@@ -52,6 +52,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "test:onboarding": "node --test tests/onboarding.test.cjs",
     "test:welcome": "node --test tests/welcome-layout.test.cjs",
     "test:auth": "node --test tests/chefu-auth.test.cjs",
     "typecheck": "tsc --noEmit",

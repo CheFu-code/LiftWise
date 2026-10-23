@@ -2,6 +2,7 @@ import { ExerciseItem, WorkoutExercise } from "@/lib/api";
 import { QueryObserverResult, RefetchOptions } from "@tanstack/react-query";
 import { ImperativeRouter } from "expo-router";
 import { Dispatch, SetStateAction } from "react";
+import type { OnboardingValues } from "@/lib/validations/onboarding-validation";
 
 export type ChefuUser = {
   uid?: string;
@@ -10,6 +11,7 @@ export type ChefuUser = {
   name?: string;
   photoURL?: string | null;
   roles?: string[];
+  gender?: string;
   fullName?: string;
   imageUrl?: string;
   primaryEmailAddress?: { emailAddress?: string };
@@ -21,12 +23,16 @@ export type ChefuAuthSession = {
   refreshToken?: string;
   expiresAt: number;
   user: ChefuUser;
+  onboardingProfile?: Partial<OnboardingValues>;
 };
 
 export type ChefuAuthContextValue = {
   isLoaded: boolean;
   isSignedIn: boolean;
   isAuthenticating: boolean;
+  isOnboardingComplete: boolean;
+  refreshOnboardingProfile: () => Promise<Partial<OnboardingValues>>;
+  saveOnboardingProfile: (values: OnboardingValues) => Promise<void>;
   userId?: string;
   session: ChefuAuthSession | null;
   user: ChefuUser | null;

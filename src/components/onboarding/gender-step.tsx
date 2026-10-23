@@ -29,7 +29,7 @@ const GenderStep = ({ value, onSelect }: GenderStepProps) => {
 
   return (
     <View className="w-full flex-1">
-      <Animated.View entering={FadeInRight.duration(250)}>
+      <Animated.View style={{ width: "100%" }} entering={FadeInRight.duration(250)}>
         <Text
           className="mt-6 w-full font-inter-bold text-[28px] leading-9 tracking-[-0.6px] text-foreground"
         >

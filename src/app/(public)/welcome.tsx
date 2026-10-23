@@ -42,10 +42,7 @@ export default function Welcome() {
                 Make your{layout.headlineBreak}next rep{layout.headlineBreak}
                 <Text style={styles.accent}>count.</Text>
               </Text>
-              {/* <Text style={styles.description}>
-                A little structure. A lot of possibility. Build your workouts,
-                track your lifts, and see how far you can go.
-              </Text> */}
+              
             </View>
 
             <View style={styles.visualColumn}>
@@ -103,10 +100,7 @@ export default function Welcome() {
               cssInterop={false}
               accessibilityRole="button"
               onPress={() =>
-                router.push({
-                  pathname: "/onboarding/[step]",
-                  params: { step: "gender" },
-                })
+                router.push("/sign-up")
               }
               style={({ pressed }) => [
                 styles.startButton,
