@@ -15,6 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import { ExerciseUIProps } from "@/types";
 
 const ExercisesUI = ({
+    headerExtra,
     exercises,
     isPending,
     muted,
@@ -60,10 +61,15 @@ const ExercisesUI = ({
                                 size={27}
                             />
                             <Text className="mt-3 font-inter text-[13px] text-muted-foreground">
-                                {isError ? "Could not load exercises" : "No exercises found"}
+                                {isError
+                                    ? "Could not load exercises"
+                                    : "No exercises found"}
                             </Text>
                             {isError && (
-                                <Button className="mt-3" onPress={() => refetch()}>
+                                <Button
+                                    className="mt-3"
+                                    onPress={() => refetch()}
+                                >
                                     Try Again
                                 </Button>
                             )}
@@ -77,7 +83,11 @@ const ExercisesUI = ({
                                 className="h-11 w-11 items-center justify-center"
                                 onPress={router.back}
                             >
-                                <Feather name="arrow-left" size={23} color={muted} />
+                                <Feather
+                                    name="arrow-left"
+                                    size={23}
+                                    color={muted}
+                                />
                             </Pressable>
                             <Text className="font-inter-bold text-[17px] text-foreground">
                                 Add Exercises
@@ -106,10 +116,13 @@ const ExercisesUI = ({
                         <Text className="mb-2 font-inter text-[12px] text-muted-foreground">
                             {selectedExercises.length} selected
                         </Text>
+                        {headerExtra}
                     </View>
                 }
                 renderItem={({ item }) => {
-                    const isSelected = selectedExercises.some(({ id }) => id === item.id);
+                    const isSelected = selectedExercises.some(
+                        ({ id }) => id === item.id,
+                    );
                     return (
                         <View className="min-h-[72px] flex-row items-center border-b border-border">
                             <TouchableOpacity
@@ -130,7 +143,11 @@ const ExercisesUI = ({
                                     </View>
                                 ) : (
                                     <View className="h-12 w-14 items-center justify-center rounded-lg bg-muted">
-                                        <Feather color={muted} name="image" size={18} />
+                                        <Feather
+                                            color={muted}
+                                            name="image"
+                                            size={18}
+                                        />
                                     </View>
                                 )}
 
@@ -149,7 +166,9 @@ const ExercisesUI = ({
                             >
                                 <Feather
                                     color={isSelected ? primary : muted}
-                                    name={isSelected ? "check-circle" : "circle"}
+                                    name={
+                                        isSelected ? "check-circle" : "circle"
+                                    }
                                     size={22}
                                 />
                             </Pressable>

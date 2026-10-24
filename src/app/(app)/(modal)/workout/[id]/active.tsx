@@ -1,3 +1,5 @@
+import { useAuth } from "@/lib/chefu-auth";
+import { fromKilograms, weightInput, type WeightUnit } from "@/lib/weight";
 import { useActionModal } from "@/components/ui/action-modal";
 import LoadingModal from "@/components/loading-modal";
 import Button from "@/components/ui/button";
@@ -32,6 +34,10 @@ type Timer = ReturnType<typeof useWorkoutTimer>;
 
 const ActiveSessionPage = () => {
     const showModal = useActionModal();
+    const { session } = useAuth();
+    const [weightUnit] = useState<WeightUnit>(
+        () => session?.onboardingProfile?.weightUnit ?? "kg",
+    );
     const navigation = useNavigation();
     const queryClient = useQueryClient();
     const router = useRouter();
@@ -73,7 +79,9 @@ const ActiveSessionPage = () => {
                     if (!completed.includes(key)) continue;
 
                     const values = valuesRef.current[key];
-                    const weight = Number(values.weight);
+                    const weight = values?.weight?.trim()
+                        ? weightInput(values.weight, weightUnit)
+                        : (exercise.targetWeight ?? undefined);
                     sets.push({
                         exerciseId: exercise.id,
                         setNumber: set,
@@ -81,11 +89,12 @@ const ActiveSessionPage = () => {
                             parseInt(values?.reps ?? "", 10) ||
                             exercise.reps ||
                             0,
-                        weight: weight > 0 ? weight : undefined,
+                        weight,
                     });
                 }
             });
             await createWorkoutSessionMutationFn({
+                weightUnit: "kg",
                 workoutId: workout.id,
                 startedAt: new Date(timer.startedAt).toISOString(),
                 completedAt: new Date().toISOString(),
@@ -100,13 +109,18 @@ const ActiveSessionPage = () => {
                 ),
             );
             return true;
-        } catch {
-            showModal("Could not save", "Check your connection");
+        } catch (cause) {
+            showModal(
+                "Could not save",
+                cause instanceof Error
+                    ? cause.message
+                    : "Check your connection",
+            );
             return false;
         } finally {
             setIsSaving(false);
         }
-    }, [completed, queryClient, timer, workout, showModal]);
+    }, [completed, queryClient, timer, workout, showModal, weightUnit]);
 
     const saveSessionRef = useRef(saveSession);
 
@@ -230,6 +244,7 @@ const ActiveSessionPage = () => {
                 showsVerticalScrollIndicator={false}
             >
                 <ActiveSession
+                    weightUnit={weightUnit}
                     completed={completed}
                     timer={timer}
                     workout={workout}
@@ -247,6 +262,7 @@ const ActiveSessionPage = () => {
 };
 
 type ActiveSessionProps = {
+    weightUnit: WeightUnit;
     completed: string[];
     onFinish: () => void;
     onLeave: () => void;
@@ -257,6 +273,7 @@ type ActiveSessionProps = {
 };
 
 function ActiveSession({
+    weightUnit,
     completed,
     onFinish,
     onLeave,
@@ -362,7 +379,10 @@ function ActiveSession({
                                         <View className="h-10 flex-row items-center px-4">
                                             {[
                                                 ["SET", "w-12"],
-                                                ["WEIGHT", "flex-1"],
+                                                [
+                                                    `WEIGHT (${weightUnit.toUpperCase()})`,
+                                                    "flex-1",
+                                                ],
                                                 ["REPS", "flex-1"],
                                                 ["STATUS", "w-14"],
                                             ].map(([label, width]) => (
@@ -407,9 +427,15 @@ function ActiveSession({
                                                         placeholder={
                                                             exercise.targetWeight
                                                                 ? String(
-                                                                      exercise.targetWeight,
+                                                                      Math.round(
+                                                                          fromKilograms(
+                                                                              exercise.targetWeight,
+                                                                              weightUnit,
+                                                                          ) *
+                                                                              100,
+                                                                      ) / 100,
                                                                   )
-                                                                : "kg"
+                                                                : weightUnit
                                                         }
                                                         placeholderTextColor={
                                                             muted

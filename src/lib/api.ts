@@ -63,6 +63,7 @@ export type SaveSessionSet = {
 };
 
 export type SaveSessionInput = {
+  weightUnit?: "kg";
   completedAt: string;
   durationSeconds: number;
   sets: SaveSessionSet[];
@@ -202,6 +203,23 @@ export async function deleteWorkoutMutationFn(id: string) {
   );
   if (error || !data?.success)
     throw new Error(error?.message || "Unable to delete workout.");
+}
+
+export async function getExerciseBookmarks() {
+  const { data, error } = await authenticatedFetch<string[]>(
+    `${API_URL}/liftwise/exercise-bookmarks`,
+  );
+  if (error || !data)
+    throw new Error(error?.message || "Unable to load saved exercises.");
+  return data;
+}
+export async function setExerciseBookmark(id: string, saved: boolean) {
+  const { data, error } = await authenticatedFetch<{ success: boolean }>(
+    `${API_URL}/liftwise/exercise-bookmarks/${encodeURIComponent(id)}`,
+    { method: saved ? "PUT" : "DELETE" },
+  );
+  if (error || !data?.success)
+    throw new Error(error?.message || "Unable to save exercise.");
 }
 
 export async function getExercisesQueryFn(search?: string) {

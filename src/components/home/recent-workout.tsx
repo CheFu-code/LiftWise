@@ -13,7 +13,7 @@ import HomeSectionHeader from "./home-section-header";
 export default function RecentWorkout() {
   const router = useRouter();
   const muted = useAppThemeColor("mutedForeground");
-  const { data, isPending } = useQuery({
+  const { data, isPending, isError, refetch } = useQuery({
     queryKey: ["history", 1],
     queryFn: () => getHistoryQueryFn(1),
   });
@@ -28,6 +28,13 @@ export default function RecentWorkout() {
 
       {isPending ? (
         <Skeleton className="min-h-[88px] w-full rounded-xl shadow-xs" />
+      ) : isError ? (
+        <EmptyState
+          message="Could not load recent workouts"
+          onRetry={() => {
+            void refetch();
+          }}
+        />
       ) : !recent ? (
         <EmptyState icon="clock" message="No recent workouts yet." />
       ) : (

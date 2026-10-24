@@ -1,16 +1,26 @@
 import { useActionModal } from "@/components/ui/action-modal";
 import { Feather } from "@expo/vector-icons";
 import Constants from "expo-constants";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
 import { useColorScheme } from "nativewind";
 import {
     useEffect,
+    useCallback,
+    useRef,
     useState,
     type ComponentProps,
     type ReactNode,
 } from "react";
-import { Image, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import {
+    AppState,
+    Image,
+    Pressable,
+    ScrollView,
+    Switch,
+    Text,
+    View,
+} from "react-native";
 
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import { useAuth } from "@/lib/chefu-auth";
@@ -30,7 +40,33 @@ export default function ProfilePage() {
         session,
         signOut: signOutAccount,
         saveOnboardingProfile,
+        refreshUser,
     } = useAuth();
+    const refreshRef = useRef(refreshUser);
+    refreshRef.current = refreshUser;
+    const refreshing = useRef(false);
+    const [refreshError, setRefreshError] = useState(false);
+    const refreshAccount = useCallback(async () => {
+        if (refreshing.current) return;
+        refreshing.current = true;
+        try {
+            await refreshRef.current();
+            setRefreshError(false);
+        } catch {
+            setRefreshError(true);
+        } finally {
+            refreshing.current = false;
+        }
+    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            void refreshAccount();
+            const listener = AppState.addEventListener("change", (state) => {
+                if (state === "active") void refreshAccount();
+            });
+            return () => listener.remove();
+        }, [refreshAccount]),
+    );
     const [savingWeightUnit, setSavingWeightUnit] = useState(false);
     const weightUnit = session?.onboardingProfile?.weightUnit ?? "kg";
 
@@ -96,7 +132,6 @@ export default function ProfilePage() {
         .join("")
         .slice(0, 2)
         .toUpperCase();
-    const soon = () => showModal("Coming soon");
 
     const signOut = async () => {
         try {
@@ -153,6 +188,18 @@ export default function ProfilePage() {
                     </Pressable>
                 </View>
 
+                {refreshError && (
+                    <Pressable
+                        onPress={() => {
+                            void refreshAccount();
+                        }}
+                        className="mt-3 p-2"
+                    >
+                        <Text className="font-inter text-[13px] text-destructive">
+                            Couldn't refresh your account. Tap to retry.
+                        </Text>
+                    </Pressable>
+                )}
                 <Section title="Preferences">
                     <Row
                         icon="activity"
@@ -162,7 +209,11 @@ export default function ProfilePage() {
                         }
                         value={savingWeightUnit ? "Saving…" : weightUnit}
                     />
-                    <Row icon="bell" label="Notifications" onPress={soon} />
+                    <Row
+                        icon="bell"
+                        label="Notifications"
+                        onPress={() => router.push("/notifications")}
+                    />
                     <Row
                         icon="moon"
                         label="Dark Mode"

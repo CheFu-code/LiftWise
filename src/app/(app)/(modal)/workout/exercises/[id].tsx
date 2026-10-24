@@ -1,3 +1,4 @@
+import { useExerciseBookmarks } from "@/hooks/use-exercise-bookmarks";
 import AiCoachModal from "@/components/exercise/ai-coach-modal";
 import Button from "@/components/ui/button";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
@@ -15,6 +16,7 @@ import { z } from "zod";
 const exerciseParamsSchema = z.object({ id: z.string().min(1) });
 
 const SingleExercise = () => {
+  const bookmarks = useExerciseBookmarks();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const foreground = useAppThemeColor("foreground");
@@ -101,8 +103,36 @@ const SingleExercise = () => {
               >
                 <Feather color="white" name="arrow-left" size={22} />
               </Pressable>
-              <Pressable className="h-10 w-10 items-center justify-center rounded-full bg-black/40 active:opacity-70">
-                <Feather color="white" name="bookmark" size={22} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  bookmarks.isError
+                    ? "Retry loading saved exercises"
+                    : bookmarks.ids.includes(exercise.id)
+                      ? "Remove saved exercise"
+                      : "Save exercise"
+                }
+                accessibilityState={{
+                  selected: bookmarks.ids.includes(exercise.id),
+                  disabled: bookmarks.isPending || bookmarks.saving,
+                }}
+                disabled={bookmarks.isPending || bookmarks.saving}
+                onPress={() =>
+                  bookmarks.isError
+                    ? void bookmarks.refetch()
+                    : bookmarks.toggle(exercise.id)
+                }
+                className="h-10 w-10 items-center justify-center rounded-full bg-black/40 active:opacity-70"
+              >
+                <Feather
+                  color={
+                    bookmarks.ids.includes(exercise.id) ? "#BEF264" : "white"
+                  }
+                  name={
+                    bookmarks.ids.includes(exercise.id) ? "check" : "bookmark"
+                  }
+                  size={22}
+                />
               </Pressable>
             </View>
           </SafeAreaView>

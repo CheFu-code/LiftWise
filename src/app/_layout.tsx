@@ -1,3 +1,4 @@
+import WorkoutReminderSync from "@/components/workout-reminder-sync";
 import { ChefuAuthProvider, useAuth } from "@/lib/chefu-auth";
 import { ActionModalProvider } from "@/components/ui/action-modal";
 import { getStatusBarStyle } from "@/lib/utils";
@@ -105,6 +106,7 @@ function RootNavigation() {
             <StatusBar animated style={statusBarStyle} />
           )}
           <ActionModalProvider>
+            <WorkoutReminderSync />
             <Stack
               screenOptions={{
                 headerShown: false,

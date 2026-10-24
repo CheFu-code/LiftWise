@@ -49,6 +49,7 @@ export type ChefuAuthContextValue = {
 
 
 export type ExerciseUIProps = {
+  headerExtra?: import("react").ReactNode;
   exercises: NoInfer<ExerciseItem[]>;
   isPending: boolean;
   muted:

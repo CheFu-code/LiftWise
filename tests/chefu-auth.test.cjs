@@ -78,7 +78,11 @@ test("concurrent requests refresh once and persist the rotated refresh token", a
     return refreshed();
   });
   await api.readSession();
-  const profile = { gender: "female", goal: "maintain", experience: "beginner" };
+  const profile = {
+    gender: "female",
+    goal: "maintain",
+    experience: "beginner",
+  };
   await api.saveSession({ ...expired(), onboardingProfile: profile });
   assert.deepEqual(
     await Promise.all([api.getToken(), api.getToken(), api.getToken()]),
@@ -125,7 +129,7 @@ test("invalid refresh grants clear session; network failures preserve it for ret
   }
 });
 
-function signInFlow(result) {
+function signInFlow(result, sessionOverrides = {}) {
   const calls = { exchange: 0, save: 0 };
   const auth = load("../src/lib/chefu-auth.ts", {
     "expo-auth-session": {
@@ -186,6 +190,7 @@ function signInFlow(result) {
         calls.save++;
         calls.savedProfile = session.onboardingProfile;
       },
+      ...sessionOverrides,
     },
   });
   return { value: auth.ChefuAuthProvider({ children: null }), calls };
@@ -225,4 +230,55 @@ test("valid callbacks exchange the verifier and registration preserves the OAuth
     new URL(url.searchParams.get("returnTo")).pathname,
     "/oauth/authorize",
   );
+});
+
+test("profile refresh preserves rotated tokens and newly saved preferences", async () => {
+  let current = {
+    token: "old",
+    user: { uid: "alice" },
+    onboardingProfile: { weightUnit: "kg" },
+  };
+  const { value } = signInFlow(
+    {},
+    {
+      getToken: async () => "old",
+      readSession: async () => current,
+      fetchUser: async () => {
+        current = {
+          ...current,
+          token: "rotated",
+          onboardingProfile: { weightUnit: "lb" },
+        };
+        return { uid: "alice", name: "Updated name" };
+      },
+      saveSession: async (next) => {
+        current = next;
+      },
+    },
+  );
+  await value.refreshUser();
+  assert.equal(current.token, "rotated");
+  assert.equal(current.onboardingProfile.weightUnit, "lb");
+  assert.equal(current.user.name, "Updated name");
+});
+
+test("a profile refresh cannot restore a signed-out account", async () => {
+  let current = { token: "old", user: { uid: "alice" } };
+  let saved = false;
+  const { value } = signInFlow(
+    {},
+    {
+      getToken: async () => "old",
+      readSession: async () => current,
+      fetchUser: async () => {
+        current = null;
+        return { uid: "alice" };
+      },
+      saveSession: async () => {
+        saved = true;
+      },
+    },
+  );
+  assert.equal(await value.refreshUser(), null);
+  assert.equal(saved, false);
 });

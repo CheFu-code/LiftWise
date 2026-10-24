@@ -1,3 +1,4 @@
+import EmptyState from "@/components/ui/empty-state";
 import { useQuery } from "@tanstack/react-query";
 import { addWeeks, startOfDay, startOfWeek, subWeeks } from "date-fns";
 import { useState } from "react";
@@ -15,7 +16,12 @@ const logo = require("../../../../assets/images/app-images/logo.png");
 const streakIcon = require("../../../../assets/images/app-images/streak-icon.png");
 
 export default function HomePage() {
-    const { currentStreak, showStreak } = useStreak();
+    const {
+        currentStreak,
+        isPending: streakPending,
+        isError: streakError,
+        showStreak,
+    } = useStreak();
 
     const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
 
@@ -23,11 +29,20 @@ export default function HomePage() {
     const calendarStart = subWeeks(currentWeekStart, 2);
     const calendarEnd = addWeeks(currentWeekStart, 1);
 
-    const { data: stats, isPending } = useQuery({
+    const {
+        data: stats,
+        isPending,
+        isError: statsError,
+        refetch: retryStats,
+    } = useQuery({
         queryKey: ["home-stats", selectedDate],
         queryFn: () => getHomeStatsQueryFn(selectedDate),
     });
-    const { data } = useQuery({
+    const {
+        data,
+        isError: calendarError,
+        refetch: retryCalendar,
+    } = useQuery({
         queryKey: [
             "workout-calendar",
             calendarStart.toISOString(),
@@ -75,7 +90,11 @@ export default function HomePage() {
                             source={streakIcon}
                         />
                         <Text className="ml-1.5 mr-0.5 font-inter-bold text-[14px] text-foreground">
-                            {currentStreak || 0}
+                            {streakPending
+                                ? "?"
+                                : streakError
+                                  ? "!"
+                                  : currentStreak}
                         </Text>
                     </Pressable>
                 </View>
@@ -87,12 +106,34 @@ export default function HomePage() {
                     value={selectedDate}
                 />
 
-                <HomeStats
-                    avgTimeSeconds={stats?.avgTimeSeconds}
-                    isPending={isPending}
-                    totalTimeSeconds={stats?.totalTimeSeconds}
-                    workouts={stats?.workouts}
-                />
+                {calendarError && (
+                    <Pressable
+                        onPress={() => {
+                            void retryCalendar();
+                        }}
+                        className="mt-2 py-2"
+                    >
+                        <Text className="font-inter text-[13px] text-destructive">
+                            Couldn't load calendar activity. Tap to retry.
+                        </Text>
+                    </Pressable>
+                )}
+                {statsError ? (
+                    <EmptyState
+                        className="mt-3"
+                        message="Could not load your stats"
+                        onRetry={() => {
+                            void retryStats();
+                        }}
+                    />
+                ) : (
+                    <HomeStats
+                        avgTimeSeconds={stats?.avgTimeSeconds}
+                        isPending={isPending}
+                        totalTimeSeconds={stats?.totalTimeSeconds}
+                        workouts={stats?.workouts}
+                    />
+                )}
 
                 <MyWorkouts />
                 <RecentWorkout />

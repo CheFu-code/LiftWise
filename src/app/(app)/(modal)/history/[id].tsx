@@ -1,3 +1,5 @@
+import { useAuth } from "@/lib/chefu-auth";
+import { formatWeight } from "@/lib/weight";
 import Button from "@/components/ui/button";
 import EmptyState from "@/components/ui/empty-state";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
@@ -11,6 +13,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 
 const SingleHistory = () => {
+    const { session } = useAuth();
+    const weightUnit = session?.onboardingProfile?.weightUnit ?? "kg";
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const mutedForeground = useAppThemeColor("mutedForeground");
@@ -69,7 +73,7 @@ const SingleHistory = () => {
                         label="Volume"
                         value={
                             data.volume !== null
-                                ? `${data.volume.toLocaleString()} kg`
+                                ? `${formatWeight(data.volume, weightUnit)} ${weightUnit}`
                                 : "-"
                         }
                     />
@@ -113,7 +117,9 @@ const SingleHistory = () => {
                                                 className="rounded-md bg-muted px-1.5 py-0.5"
                                             >
                                                 <Text className="font-inter text-[10px] text-muted-foreground">
-                                                    {(set.weight || 0) ?? "—"}kg
+                                                    {set.weight == null
+                                                        ? "\u2014"
+                                                        : `${formatWeight(set.weight, weightUnit)} ${weightUnit}`}
                                                     × {set.reps}
                                                 </Text>
                                             </View>

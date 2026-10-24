@@ -1,3 +1,5 @@
+import EmptyState from "@/components/ui/empty-state";
+import Skeleton from "@/components/ui/skeleton";
 import { Feather } from "@expo/vector-icons";
 import {
   eachDayOfInterval,
@@ -17,6 +19,9 @@ import { cn } from "@/lib/utils";
 const streakIcon = require("../../../assets/images/app-images/streak-icon.png");
 
 type StreakBottomSheetProps = {
+  isPending?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   bestStreak?: number;
   completedDays?: Date[];
   currentStreak?: number;
@@ -25,6 +30,9 @@ type StreakBottomSheetProps = {
 };
 
 export default function StreakBottomSheet({
+  isPending,
+  isError,
+  onRetry,
   bestStreak = 0,
   completedDays = [],
   currentStreak = 0,
@@ -73,58 +81,68 @@ export default function StreakBottomSheet({
             </View>
           </View>
 
-          <Text className="text-center font-inter-medium text-[14px] text-muted-foreground">
-            Workout Streak
-          </Text>
-          <Text className="mt-1 text-center font-inter-bold text-[38px] tracking-[-1px] text-foreground">
-            {currentStreak} {dayLabel}
-          </Text>
+          {isPending ? (
+            <Skeleton className="h-40 w-full rounded-2xl" />
+          ) : isError ? (
+            <EmptyState
+              message="Could not load your streak"
+              onRetry={onRetry}
+            />
+          ) : (
+            <>
+              <Text className="text-center font-inter-medium text-[14px] text-muted-foreground">
+                Workout Streak
+              </Text>
+              <Text className="mt-1 text-center font-inter-bold text-[38px] tracking-[-1px] text-foreground">
+                {currentStreak} {dayLabel}
+              </Text>
 
-          <View className="mt-7 flex-row gap-1.5">
-            {week.map((day) => {
-              const completed = completedDays.some((completedDay) =>
-                isSameDay(completedDay, day),
-              );
-              const isToday = isSameDay(day, today);
-              const isFuture = isAfter(day, today);
+              <View className="mt-7 flex-row gap-1.5">
+                {week.map((day) => {
+                  const completed = completedDays.some((completedDay) =>
+                    isSameDay(completedDay, day),
+                  );
+                  const isToday = isSameDay(day, today);
+                  const isFuture = isAfter(day, today);
 
-              return (
-                <View
-                  className={cn(
-                    "h-[82px] flex-1 items-center justify-center rounded-2xl border bg-background",
-                    isToday ? "border-primary" : "border-border",
-                    isFuture && "opacity-40",
-                  )}
-                  key={day.toISOString()}
-                >
-                  <Text className="font-inter-semibold text-[10px] text-muted-foreground">
-                    {format(day, "EE").toUpperCase()}
-                  </Text>
-                  {completed ? (
-                    <View className="mt-2 h-8 w-8 items-center justify-center rounded-full bg-primary">
-                      <Feather color="#FFFFFF" name="check" size={17} />
+                  return (
+                    <View
+                      className={cn(
+                        "h-[82px] flex-1 items-center justify-center rounded-2xl border bg-background",
+                        isToday ? "border-primary" : "border-border",
+                        isFuture && "opacity-40",
+                      )}
+                      key={day.toISOString()}
+                    >
+                      <Text className="font-inter-semibold text-[10px] text-muted-foreground">
+                        {format(day, "EE").toUpperCase()}
+                      </Text>
+                      {completed ? (
+                        <View className="mt-2 h-8 w-8 items-center justify-center rounded-full bg-primary">
+                          <Feather color="#FFFFFF" name="check" size={17} />
+                        </View>
+                      ) : (
+                        <Text className="mt-2 font-inter-semibold text-[15px] text-foreground">
+                          {format(day, "dd")}
+                        </Text>
+                      )}
                     </View>
-                  ) : (
-                    <Text className="mt-2 font-inter-semibold text-[15px] text-foreground">
-                      {format(day, "dd")}
-                    </Text>
-                  )}
-                </View>
-              );
-            })}
-          </View>
+                  );
+                })}
+              </View>
 
-          <Text className="mt-7 text-center font-inter-semibold text-[15px] text-foreground">
-            Best: {bestStreak} {bestStreak === 1 ? "day" : "days"}
-          </Text>
-          <Text className="mt-2 text-center font-inter text-[13px] leading-5 text-muted-foreground">
-            {completedToday
-              ? "Keep showing up. Your consistency is getting stronger."
-              : currentStreak > 0
-                ? "Complete a workout today to keep your streak going."
-                : "Complete a workout today to start your streak."}
-          </Text>
-
+              <Text className="mt-7 text-center font-inter-semibold text-[15px] text-foreground">
+                Best: {bestStreak} {bestStreak === 1 ? "day" : "days"}
+              </Text>
+              <Text className="mt-2 text-center font-inter text-[13px] leading-5 text-muted-foreground">
+                {completedToday
+                  ? "Keep showing up. Your consistency is getting stronger."
+                  : currentStreak > 0
+                    ? "Complete a workout today to keep your streak going."
+                    : "Complete a workout today to start your streak."}
+              </Text>
+            </>
+          )}
           <Button className="mt-7 h-16 rounded-full" onPress={onClose}>
             Okay
           </Button>

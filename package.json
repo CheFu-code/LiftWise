@@ -24,6 +24,7 @@
     "expo-linear-gradient": "~57.0.1",
     "expo-linking": "~57.0.5",
     "expo-network": "^57.0.1",
+    "expo-notifications": "~57.0.24",
     "expo-router": "~57.0.11",
     "expo-secure-store": "^57.0.1",
     "expo-splash-screen": "~57.0.5",
@@ -52,6 +53,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "test:dynamic": "node --test tests/dynamic-features.test.cjs",
     "test:workout-order": "node --test tests/workout-order.test.cjs",
     "test:modal": "node --test tests/action-modal.test.cjs",
     "test:onboarding": "node --test tests/onboarding.test.cjs",

@@ -2,6 +2,7 @@ import EmptyState from "@/components/ui/empty-state";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Skeleton from "@/components/ui/skeleton";
 import { getWorkoutsQueryFn } from "@/lib/api";
+import { filterWorkouts } from "@/lib/workout-search";
 import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -37,7 +38,7 @@ const Workouts = () => {
     return (
         <SafeAreaScreen edges={["top", "bottom"]}>
             <FlatList
-                data={workouts}
+                data={filterWorkouts(workouts, query)}
                 contentContainerClassName="px-5 pb-24"
                 ItemSeparatorComponent={() => <View className="h-3" />}
                 keyExtractor={(item) => item.id}

@@ -174,10 +174,17 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
     refreshUser: async () => {
       const token = await getToken();
       if (!token) return null;
-      const user = await fetchUser(token);
       const current = await readSession();
       if (!current) return null;
-      await saveSession({ ...current, user });
+      const user = await fetchUser(token);
+      const latest = await readSession();
+      if (
+        !latest ||
+        latest.user.uid !== current.user.uid ||
+        user.uid !== latest.user.uid
+      )
+        return null;
+      await saveSession({ ...latest, user });
       return user;
     },
   };
