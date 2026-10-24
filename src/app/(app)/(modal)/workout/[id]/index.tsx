@@ -6,12 +6,14 @@ import Skeleton from "@/components/ui/skeleton";
 import { useActionModal } from "@/components/ui/action-modal";
 import {
     deleteWorkoutMutationFn,
-    duplicateWorkoutMutationFn,
+    changeWorkoutCoverMutationFn,
+    type WorkoutDetail,
     getWorkoutQueryFn,
     reorderWorkoutExercisesMutationFn,
 } from "@/lib/api";
 import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -22,6 +24,7 @@ import {
     StyleSheet,
     useWindowDimensions,
     Image,
+    Linking,
     Pressable,
     ScrollView,
     Text,
@@ -118,18 +121,60 @@ const Index = () => {
         }
     };
 
-    const runAction = async (action: "duplicate" | "delete") => {
+    const runAction = async (action: "cover" | "delete") => {
         if (!workout || inFlight.current) return;
         inFlight.current = true;
         setBusy(true);
         try {
-            if (action === "duplicate") {
-                const copy = await duplicateWorkoutMutationFn(id);
-                await queryClient.invalidateQueries({ queryKey: ["workouts"] });
-                router.replace({
-                    pathname: "/workout/[id]",
-                    params: { id: copy.id },
+            if (action === "cover") {
+                if (Platform.OS !== "web") {
+                    const permission =
+                        await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    if (!permission.granted) {
+                        showModal(
+                            "Photo permission needed",
+                            "Allow photo access in Settings to choose a workout cover.",
+                            [
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                    text: "Open Settings",
+                                    onPress: Linking.openSettings,
+                                },
+                            ],
+                        );
+                        return;
+                    }
+                }
+                const result = await ImagePicker.launchImageLibraryAsync({
+                    allowsEditing: true,
+                    aspect: [16, 9],
+                    base64: true,
+                    mediaTypes: ["images"],
+                    quality: 0.6,
                 });
+                if (result.canceled) return;
+                const image = result.assets?.[0]?.base64;
+                if (!image)
+                    throw new Error(
+                        "Unable to read that photo. Please choose another image.",
+                    );
+                if (image.length > 2_800_000)
+                    throw new Error(
+                        "Please choose an image smaller than 2 MB.",
+                    );
+                const updated = await changeWorkoutCoverMutationFn(id, image);
+                await queryClient.cancelQueries({
+                    queryKey: ["workouts", id],
+                    exact: true,
+                });
+                queryClient.setQueryData<WorkoutDetail | null>(
+                    ["workouts", id],
+                    (current) =>
+                        current
+                            ? { ...current, image: updated.image }
+                            : current,
+                );
+                await queryClient.invalidateQueries({ queryKey: ["workouts"] });
             } else {
                 await deleteWorkoutMutationFn(id);
                 await queryClient.cancelQueries({
@@ -145,8 +190,8 @@ const Index = () => {
             }
         } catch (cause) {
             showModal(
-                action === "duplicate"
-                    ? "Unable to duplicate workout"
+                action === "cover"
+                    ? "Unable to change cover image"
                     : "Unable to delete workout",
                 cause instanceof Error ? cause.message : "Please try again.",
             );
@@ -326,7 +371,8 @@ const Index = () => {
                                 </Text>
                                 {exercises.length > 1 && (
                                     <Text className="mb-3 font-inter text-[12px] text-muted-foreground">
-                                        Drag the handles to reorder. Changes save automatically.
+                                        Drag the handles to reorder. Changes
+                                        save automatically.
                                     </Text>
                                 )}
                                 {exercises.length === 0 ? (
@@ -374,12 +420,16 @@ const Index = () => {
                             className="min-h-12 flex-row items-center gap-3 px-4 py-3 active:bg-muted"
                             onPress={() => {
                                 setMenuTop(null);
-                                void runAction("duplicate");
+                                void runAction("cover");
                             }}
                         >
-                            <Feather name="copy" size={18} color={foreground} />
+                            <Feather
+                                name="image"
+                                size={18}
+                                color={foreground}
+                            />
                             <Text className="flex-1 font-inter-medium text-[14px] text-foreground">
-                                Duplicate
+                                Change cover image
                             </Text>
                         </Pressable>
                         <Pressable

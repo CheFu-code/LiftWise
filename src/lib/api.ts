@@ -171,6 +171,20 @@ export async function reorderWorkoutExercisesMutationFn(
     throw new Error(error?.message || "Unable to save exercise order.");
 }
 
+export async function changeWorkoutCoverMutationFn(id: string, image: string) {
+  const { data, error } = await authenticatedFetch<{ image: string }>(
+    `${API_URL}/liftwise/workouts/${encodeURIComponent(id)}/cover`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image }),
+    },
+  );
+  if (error || !data?.image)
+    throw new Error(error?.message || "Unable to change cover image.");
+  return data;
+}
+
 export async function duplicateWorkoutMutationFn(id: string) {
   const { data, error } = await authenticatedFetch<WorkoutDetail>(
     `${API_URL}/liftwise/workouts/${encodeURIComponent(id)}/duplicate`,
