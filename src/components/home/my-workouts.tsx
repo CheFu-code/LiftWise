@@ -2,13 +2,8 @@ import { Feather, FontAwesome6 } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import {
-    Image,
-    ScrollView,
-    Text,
-    useWindowDimensions,
-    View,
-} from "react-native";
+import { ScrollView, Text, useWindowDimensions, View } from "react-native";
+import Image from "@/components/ui/cached-image";
 import Pressable from "@/components/ui/guarded-pressable";
 
 import EmptyState from "@/components/ui/empty-state";
@@ -33,9 +28,9 @@ export default function MyWorkouts() {
         isError,
         isPending,
     } = useQuery({
-        queryFn: () => getWorkoutsQueryFn(4),
-        queryKey: ["workouts", { limit: 4 }],
-        refetchOnMount: false,
+        queryFn: () => getWorkoutsQueryFn(),
+        queryKey: ["workouts"],
+        select: (workouts) => workouts?.slice(0, 4) ?? [],
     });
 
     return (

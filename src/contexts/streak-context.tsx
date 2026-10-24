@@ -42,7 +42,7 @@ export function StreakProvider({ children }: React.PropsWithChildren) {
       value={{
         currentStreak: streak.currentStreak,
         isPending,
-        isError,
+        isError: isError && !data,
         showStreak,
       }}
     >
@@ -50,7 +50,7 @@ export function StreakProvider({ children }: React.PropsWithChildren) {
 
       <StreakBottomSheet
         isPending={isPending}
-        isError={isError}
+        isError={isError && !data}
         onRetry={() => {
           void refetch();
         }}

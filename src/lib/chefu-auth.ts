@@ -16,6 +16,7 @@ import {
   postOnboardingProfile,
 } from "./onboarding-profile";
 import type { ChefuAuthContextValue, ChefuAuthSession } from "@/types";
+import { purgeQueryCache } from "./query-persistence";
 import {
   CLIENT_ID,
   DISCOVERY,
@@ -33,6 +34,12 @@ const ACCOUNT_URL =
 const ChefuAuthContext = createContext<ChefuAuthContextValue | null>(null);
 let profileWritePending = false;
 let profileRevision = 0;
+let profileRefresh: {
+  uid?: string;
+  request: Promise<
+    Partial<Parameters<ChefuAuthContextValue["saveOnboardingProfile"]>[0]>
+  >;
+} | null = null;
 
 export async function saveProfile(
   values: Parameters<ChefuAuthContextValue["saveOnboardingProfile"]>[0],
@@ -44,10 +51,12 @@ export async function saveProfile(
   let previous: ChefuAuthSession | null = null;
   let optimistic = false;
   try {
+    const target = await readSession();
     const token = await getToken();
     if (!token) throw new Error("Please sign in again.");
     previous = await readSession();
-    if (!previous) throw new Error("Please sign in again.");
+    if (!target || !previous || target.user.uid !== previous.user.uid)
+      throw new Error("Please sign in again.");
     // Keep first-time onboarding on its form until the server accepts it.
     optimistic = onboardingValuesSchema.safeParse(
       previous.onboardingProfile,
@@ -58,12 +67,14 @@ export async function saveProfile(
         onboardingProfile: values,
         user: { ...previous.user, gender: values.gender },
       });
-    await postOnboardingProfile(token, values);
+    await postOnboardingProfile(token, values, previous.onboardingProfile);
     const latest = await readSession();
     if (
       latest &&
       latest.user.uid === previous.user.uid &&
-      (!optimistic || latest.onboardingProfile === values)
+      (optimistic
+        ? latest.onboardingProfile === values
+        : latest.onboardingProfile === previous.onboardingProfile)
     )
       await saveSession({
         ...latest,
@@ -91,11 +102,13 @@ export async function saveProfile(
   }
 }
 
-async function refreshOnboardingProfile() {
+async function loadOnboardingProfile() {
   const revision = profileRevision;
+  const current = await readSession();
   const token = await getToken();
   if (!token) throw new Error("Please sign in again.");
-  const current = await readSession();
+  if (!current || (await readSession())?.user.uid !== current.user.uid)
+    throw new Error("Your account changed. Please try again.");
   const onboardingProfile = await fetchOnboardingProfile(token);
   const latest = await readSession();
   if (
@@ -110,6 +123,19 @@ async function refreshOnboardingProfile() {
   return onboardingProfile;
 }
 
+async function refreshOnboardingProfile() {
+  const uid = (await readSession())?.user.uid;
+  if (profileRefresh?.uid === uid && profileRefresh)
+    return profileRefresh.request;
+  const request = loadOnboardingProfile();
+  profileRefresh = { uid, request };
+  try {
+    return await request;
+  } finally {
+    if (profileRefresh?.request === request) profileRefresh = null;
+  }
+}
+
 export function ChefuAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<ChefuAuthSession | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -119,7 +145,11 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     void readSession()
-      .then(refreshOnboardingProfile)
+      .then((current) => {
+        if (active) setIsLoaded(true);
+        if (current && active)
+          void refreshOnboardingProfile().catch(() => undefined);
+      })
       .catch(() => undefined)
       .finally(() => {
         if (active) setIsLoaded(true);
@@ -216,9 +246,11 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
       }
     },
     signOut: async () => {
+      const uid = (await readSession())?.user.uid;
       await saveSession(null);
       await queryClient.cancelQueries();
       queryClient.clear();
+      await purgeQueryCache(uid).catch(() => undefined);
     },
     refreshUser: async () => {
       const token = await getToken();

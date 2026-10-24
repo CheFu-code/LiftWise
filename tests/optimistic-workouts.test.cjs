@@ -110,7 +110,7 @@ test("rollback cannot overwrite a newer cover or restore data after sign-out", a
   assert.equal(list(client), undefined);
 });
 
-test("background refetch waits for all workout writes, and settling is idempotent", async () => {
+test("rollback refetch waits for all workout writes, and settling is idempotent", async () => {
   const client = setup();
   let refetches = 0;
   client.invalidateQueries = async () => {
@@ -118,9 +118,46 @@ test("background refetch waits for all workout writes, and settling is idempoten
   };
   const first = await optimisticWorkoutChange(client, "a", { image: "new-a" });
   const second = await optimisticWorkoutChange(client, "b", { deleted: true });
+  first();
   first.settle();
   assert.equal(refetches, 0);
   second.settle();
   second.settle();
   assert.equal(refetches, 1);
+});
+
+test("confirmed writes update every cover URL without refetching workouts", async () => {
+  const client = setup();
+  let refetches = 0;
+  client.invalidateQueries = async () => {
+    refetches++;
+  };
+  const pending = await optimisticWorkoutChange(client, "a", {
+    image: "local-photo",
+  });
+  pending.confirmImage("https://example.com/saved.jpg");
+  pending.settle();
+  assert.equal(refetches, 0);
+  assert.equal(detail(client).image, "https://example.com/saved.jpg");
+  assert.equal(list(client)[0].image, "https://example.com/saved.jpg");
+});
+
+test("server confirmation wins over an old refetch result during an optimistic edit", async () => {
+  const client = setup();
+  const before = detail(client);
+  const cover = await optimisticWorkoutChange(client, "a", { image: "local-photo" });
+  client.setQueryData(["workouts", "a"], before);
+  cover.confirmImage("https://example.com/saved.jpg");
+  cover.settle();
+  assert.equal(detail(client).image, "https://example.com/saved.jpg");
+  const order = await optimisticWorkoutChange(client, "a", { exerciseIds: ["bench", "squat"] });
+  client.setQueryData(["workouts", "a"], before);
+  order.confirmOrder();
+  order.settle();
+  assert.deepEqual(Array.from(detail(client).exercises, (exercise) => exercise.id), ["bench", "squat"]);
+  const deletion = await optimisticWorkoutChange(client, "a", { deleted: true });
+  client.setQueryData(["workouts"], [{ id: "a" }, { id: "b" }]);
+  deletion.confirmDeletion();
+  deletion.settle();
+  assert.deepEqual(Array.from(list(client), (workout) => workout.id), ["b"]);
 });

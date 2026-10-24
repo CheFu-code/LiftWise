@@ -8,14 +8,8 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import {
-    FlatList,
-    Image,
-    RefreshControl,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
+import { FlatList, RefreshControl, Text, TextInput, View } from "react-native";
+import Image from "@/components/ui/cached-image";
 import { TouchableOpacity } from "@/components/ui/guarded-pressable";
 
 const Workouts = () => {
@@ -33,7 +27,6 @@ const Workouts = () => {
     } = useQuery({
         queryFn: () => getWorkoutsQueryFn(),
         queryKey: ["workouts"],
-        refetchOnMount: false,
     });
 
     return (

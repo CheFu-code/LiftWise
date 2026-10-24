@@ -1,11 +1,5 @@
-import {
-    FlatList,
-    Image,
-    RefreshControl,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
+import { FlatList, RefreshControl, Text, TextInput, View } from "react-native";
+import Image from "@/components/ui/cached-image";
 import Pressable from "@/components/ui/guarded-pressable";
 import { TouchableOpacity } from "@/components/ui/guarded-pressable";
 import Button from "@/components/ui/button";

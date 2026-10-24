@@ -25,12 +25,12 @@ import {
     Platform,
     StyleSheet,
     useWindowDimensions,
-    Image,
     Linking,
     ScrollView,
     Text,
     View,
 } from "react-native";
+import Image from "@/components/ui/cached-image";
 import Pressable from "@/components/ui/guarded-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -79,7 +79,6 @@ const Index = () => {
         refetch,
     } = useQuery({
         queryKey: ["workouts", id],
-        refetchOnMount: false,
         queryFn: () => getWorkoutQueryFn(id),
         enabled: Boolean(id),
     });
@@ -106,6 +105,7 @@ const Index = () => {
                 exerciseIds,
             });
             await reorderWorkoutExercisesMutationFn(id, exerciseIds);
+            rollback.confirmOrder();
         } catch (cause) {
             rollback?.();
             showToast("Failed to save exercise order. Please try again.");
@@ -182,13 +182,7 @@ const Index = () => {
                     detailQuery
                 )
                     return;
-                queryClient.setQueryData<WorkoutDetail | null>(
-                    ["workouts", id],
-                    (current) =>
-                        current
-                            ? { ...current, image: updated.image }
-                            : current,
-                );
+                rollback.confirmImage(updated.image);
             } else {
                 rollback = await optimisticWorkoutChange(queryClient, id, {
                     deleted: true,
@@ -202,6 +196,7 @@ const Index = () => {
                     detailQuery
                 )
                     return;
+                rollback.confirmDeletion();
                 deleted = true;
             }
         } catch (cause) {
@@ -333,7 +328,7 @@ const Index = () => {
                         </View>
                     </SafeAreaView>
 
-                    {isError ? (
+                    {isError && !workout ? (
                         <EmptyState
                             message="Could not load this workout"
                             onRetry={refetch}

@@ -3,13 +3,14 @@ import AiCoachModal from "@/components/exercise/ai-coach-modal";
 import Button from "@/components/ui/button";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Skeleton from "@/components/ui/skeleton";
-import { getExerciseQueryFn } from "@/lib/api";
+import { getExerciseQueryFn, type ExerciseItem } from "@/lib/api";
 import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Image, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
+import Image from "@/components/ui/cached-image";
 import Pressable from "@/components/ui/guarded-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { z } from "zod";
@@ -17,6 +18,7 @@ import { z } from "zod";
 const exerciseParamsSchema = z.object({ id: z.string().min(1) });
 
 const SingleExercise = () => {
+    const client = useQueryClient();
     const bookmarks = useExerciseBookmarks();
     const router = useRouter();
     const params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -38,9 +40,15 @@ const SingleExercise = () => {
         enabled: Boolean(id),
         queryFn: () => getExerciseQueryFn(id),
         queryKey: ["exercise", id],
+        initialData: () =>
+            client
+                .getQueryData<ExerciseItem[]>(["exercises"])
+                ?.find((exercise) => exercise.id === id),
+        initialDataUpdatedAt: () =>
+            client.getQueryState(["exercises"])?.dataUpdatedAt,
     });
 
-    if (!id || isError) {
+    if (!id || (isError && !exercise)) {
         return (
             <SafeAreaScreen className="px-5" edges={["top", "bottom"]}>
                 <Pressable

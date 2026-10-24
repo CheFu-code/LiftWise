@@ -183,6 +183,7 @@ function signInFlow(result, sessionOverrides = {}, profileOverrides = {}) {
       postOnboardingProfile: async () => {},
       ...profileOverrides,
     },
+    "./query-persistence": { purgeQueryCache: async () => {} },
     "./chefu-session": {
       CLIENT_ID: "liftwise-mobile",
       DISCOVERY: {},
@@ -397,4 +398,84 @@ test("first-time onboarding only completes after the server accepts the answers"
   resolve();
   await saving;
   assert.equal(current.onboardingProfile.experience, "beginner");
+});
+
+test("concurrent profile refreshes share a request and cannot overwrite preferences saved during refresh", async () => {
+  let current = {
+    token: "old",
+    user: { uid: "alice" },
+    onboardingProfile: completeProfile,
+  };
+  let profileCalls = 0;
+  let finishRefresh;
+  let finishSave;
+  const { value } = signInFlow(
+    {},
+    {
+      getToken: async () => "old",
+      readSession: async () => current,
+      saveSession: async (next) => {
+        current = next;
+      },
+    },
+    {
+      fetchOnboardingProfile: () => {
+        profileCalls++;
+        return new Promise((resolve) => {
+          finishRefresh = resolve;
+        });
+      },
+      postOnboardingProfile: () =>
+        new Promise((resolve) => {
+          finishSave = resolve;
+        }),
+    },
+  );
+  const first = value.refreshOnboardingProfile();
+  const second = value.refreshOnboardingProfile();
+  await flush();
+  assert.equal(profileCalls, 1);
+  const saving = value.saveOnboardingProfile({
+    ...completeProfile,
+    weightUnit: "lb",
+  });
+  await flush();
+  finishRefresh(completeProfile);
+  await Promise.all([first, second]);
+  assert.equal(current.onboardingProfile.weightUnit, "lb");
+  finishSave();
+  await saving;
+});
+
+test("changing accounts while acquiring a token cannot save preferences under the new account", async () => {
+  let current = {
+    token: "old",
+    user: { uid: "alice" },
+    onboardingProfile: completeProfile,
+  };
+  let writes = 0;
+  const { value } = signInFlow(
+    {},
+    {
+      getToken: async () => {
+        current = { ...current, token: "new", user: { uid: "bob" } };
+        return "new";
+      },
+      readSession: async () => current,
+      saveSession: async (next) => {
+        current = next;
+      },
+    },
+    {
+      postOnboardingProfile: async () => {
+        writes++;
+      },
+    },
+  );
+  await assert.rejects(
+    value.saveOnboardingProfile({ ...completeProfile, weightUnit: "lb" }),
+  );
+  assert.equal(writes, 0);
+  assert.equal(current.user.uid, "bob");
+  assert.equal(current.onboardingProfile.weightUnit, "kg");
 });

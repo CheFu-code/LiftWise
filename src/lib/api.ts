@@ -114,10 +114,20 @@ export type HomeStats = {
 
 export type WorkoutCalendarDates = {
   workoutDates: string[];
+  sessions: {
+    startedAt: string;
+    completedAt: string;
+    durationSeconds: number;
+  }[];
+};
+export type HistoryPage = {
+  items: HistorySessionItem[];
+  nextCursor: string | null;
+  summary?: { workouts: number; totalTimeSeconds: number };
 };
 
 export async function createWorkoutMutationFn(data: CreateWorkoutInput) {
-  const { data: result, error } = await authenticatedFetch(
+  const { data: result, error } = await authenticatedFetch<WorkoutDetail>(
     `${API_URL}/liftwise/workouts`,
     {
       method: "POST",
@@ -287,6 +297,21 @@ export async function getHistoryQueryFn(limit?: number) {
   return data;
 }
 
+export async function getHistoryPage(cursor?: string, day?: Date) {
+  const params = new URLSearchParams({ limit: "20" });
+  if (cursor) params.set("cursor", cursor);
+  if (day) {
+    params.set("start", startOfDay(day).toISOString());
+    params.set("end", addDays(startOfDay(day), 1).toISOString());
+  }
+  const { data, error } = await authenticatedFetch<HistoryPage>(
+    `${API_URL}/liftwise/workout-sessions/page?${params}`,
+  );
+  if (error || !data)
+    throw new Error(error?.message || "Unable to load workout history.");
+  return data;
+}
+
 export async function getHistoryDetailQueryFn(id: string) {
   const { data, error } = await authenticatedFetch<HistoryDetail>(
     `${API_URL}/liftwise/workout-sessions/${id}`,
@@ -336,10 +361,9 @@ export async function getWorkoutCalendarDatesQueryFn(start: Date, end: Date) {
 }
 
 export async function getStreakQueryFn() {
-  const { data, error } = await authenticatedFetch<WorkoutCalendarDates>(
-    `${API_URL}/liftwise/workout-sessions/streak`,
-    { method: "GET" },
-  );
+  const { data, error } = await authenticatedFetch<
+    Pick<WorkoutCalendarDates, "workoutDates">
+  >(`${API_URL}/liftwise/workout-sessions/streak`, { method: "GET" });
   if (error) throw new Error(error.message);
 
   return data;

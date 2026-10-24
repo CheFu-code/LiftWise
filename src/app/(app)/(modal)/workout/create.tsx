@@ -4,6 +4,7 @@ import Button from "@/components/ui/button";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import { useWorkoutDraft } from "@/contexts/workout-draft-context";
 import { createWorkoutMutationFn } from "@/lib/api";
+import { cacheCreatedWorkout } from "@/lib/workout-cache";
 import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -65,8 +66,8 @@ const CreateWorkout = () => {
       }),
     onError: () =>
       showToast("Failed to create workout. Your draft is ready to retry."),
-    onSuccess: async () => {
-      void queryClient.invalidateQueries({ queryKey: ["workouts"] });
+    onSuccess: (workout) => {
+      if (workout) cacheCreatedWorkout(queryClient, workout);
       setSelectedExercises([]);
       router.push("/workouts");
     },

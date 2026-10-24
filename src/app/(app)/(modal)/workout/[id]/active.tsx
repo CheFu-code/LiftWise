@@ -108,9 +108,15 @@ const ActiveSessionPage = () => {
             });
 
             void Promise.all(
-                ["history", "home-stats", "workout-calendar", "streak"].map(
+                ["history", "history-pages", "workout-calendar", "streak"].map(
                     (queryKey) =>
-                        queryClient.invalidateQueries({ queryKey: [queryKey] }),
+                        queryClient.invalidateQueries({
+                            queryKey: [queryKey],
+                            // Completed session details are immutable; only list/summary data changes.
+                            predicate: (query) =>
+                                queryKey !== "history" ||
+                                typeof query.queryKey[1] !== "string",
+                        }),
                 ),
             );
             return true;
@@ -243,7 +249,7 @@ const ActiveSessionPage = () => {
 
     if (isPending) return <ActiveSkeleton />;
 
-    if (isError || !workout) {
+    if (!workout) {
         return (
             <EmptyState
                 message="Could not load this workout"

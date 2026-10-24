@@ -10,7 +10,8 @@ import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Image, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
+import Image from "@/components/ui/cached-image";
 import Pressable from "@/components/ui/guarded-pressable";
 
 const SingleHistory = () => {
@@ -24,11 +25,12 @@ const SingleHistory = () => {
         queryKey: ["history", id],
         queryFn: () => getHistoryDetailQueryFn(id),
         enabled: Boolean(id),
+        staleTime: 24 * 60 * 60_000,
     });
 
     if (isPending) return <HistoryDetailSkeleton />;
 
-    if (!Error || !data) {
+    if (!data) {
         return (
             <EmptyState
                 message="Could not load this history session"

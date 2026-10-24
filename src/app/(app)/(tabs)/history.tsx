@@ -1,49 +1,89 @@
 import EmptyState from "@/components/ui/empty-state";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Skeleton from "@/components/ui/skeleton";
+import Button from "@/components/ui/button";
+import { useWorkoutCalendar } from "@/hooks/use-workout-calendar";
 import WeekCalendar from "@/components/week-calendar";
-import { getHistoryQueryFn, HistorySessionItem } from "@/lib/api";
+import { getHistoryPage, HistorySessionItem } from "@/lib/api";
 import { formatDuration, formatSessionDate } from "@/lib/format";
 import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
-import { isSameDay, startOfDay } from "date-fns";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { startOfDay } from "date-fns";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { FlatList, Image, Text, View } from "react-native";
+import { FlatList, RefreshControl, Text, View } from "react-native";
+import Image from "@/components/ui/cached-image";
 import Pressable from "@/components/ui/guarded-pressable";
 
 const History = () => {
     const router = useRouter();
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const calendar = useWorkoutCalendar();
     const {
-        data = [],
+        data,
         isError,
         isPending,
         refetch,
-    } = useQuery({
-        queryKey: ["history"],
-        queryFn: () => getHistoryQueryFn(),
+        hasNextPage,
+        fetchNextPage,
+        isFetchingNextPage,
+        isFetchNextPageError,
+        isRefetching,
+    } = useInfiniteQuery({
+        queryKey: [
+            "history-pages",
+            selectedDate ? startOfDay(selectedDate).toISOString() : "all",
+        ],
+        initialPageParam: undefined as string | undefined,
+        queryFn: ({ pageParam }) =>
+            getHistoryPage(pageParam, selectedDate ?? undefined),
+        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     });
 
-    const filtered = selectedDate
-        ? data.filter((item) =>
-              isSameDay(new Date(item.completedAt), selectedDate),
-          )
-        : data;
-
-    const workoutDates = data.map((item) => new Date(item.completedAt));
-
-    const totalSeconds = filtered.reduce(
-        (sum, item) => sum + item.durationSeconds,
-        0,
-    );
+    const filtered = data?.pages.flatMap((page) => page.items) ?? [];
+    const summary = data?.pages[0].summary;
+    const workoutDates =
+        calendar.data?.sessions.map(
+            (session) => new Date(session.completedAt),
+        ) ?? [];
     return (
         <SafeAreaScreen edges={["top", "bottom"]}>
             <FlatList
                 data={isPending ? [] : filtered}
                 contentContainerClassName="px-5 pb-6"
                 keyExtractor={(item) => item.id}
+                onEndReachedThreshold={0.4}
+                onEndReached={() => {
+                    if (
+                        hasNextPage &&
+                        !isFetchingNextPage &&
+                        !isFetchNextPageError
+                    )
+                        void fetchNextPage();
+                }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefetching && !isFetchingNextPage}
+                        onRefresh={() => {
+                            void refetch();
+                        }}
+                    />
+                }
+                ListFooterComponent={
+                    hasNextPage ? (
+                        <Button
+                            className="mt-4"
+                            variant="outline"
+                            isLoading={isFetchingNextPage}
+                            onPress={() => fetchNextPage()}
+                        >
+                            {isFetchNextPageError
+                                ? "Retry loading more"
+                                : "Load more"}
+                        </Button>
+                    ) : null
+                }
                 ItemSeparatorComponent={() => <View className="h-3" />}
                 ListEmptyComponent={
                     isPending ? (
@@ -76,6 +116,15 @@ const History = () => {
                                 onChange={setSelectedDate}
                                 value={selectedDate ?? startOfDay(new Date())}
                             />
+                            {calendar.isError && !calendar.data && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onPress={() => calendar.refetch()}
+                                >
+                                    Retry calendar activity
+                                </Button>
+                            )}
                         </View>
 
                         <View className="my-5 flex-row gap-3">
@@ -88,12 +137,14 @@ const History = () => {
                                 <>
                                     <SummaryCard
                                         label="Workouts"
-                                        value={String(filtered.length)}
+                                        value={String(summary?.workouts ?? 0)}
                                     />
 
                                     <SummaryCard
                                         label="Total Time"
-                                        value={formatDuration(totalSeconds)}
+                                        value={formatDuration(
+                                            summary?.totalTimeSeconds ?? 0,
+                                        )}
                                     />
                                 </>
                             )}

@@ -1,6 +1,7 @@
 import EmptyState from "@/components/ui/empty-state";
-import { useQuery } from "@tanstack/react-query";
-import { addWeeks, startOfDay, startOfWeek, subWeeks } from "date-fns";
+import { startOfDay } from "date-fns";
+import { useWorkoutCalendar } from "@/hooks/use-workout-calendar";
+import { calendarStats } from "@/lib/calendar-stats";
 import { useState } from "react";
 import { Image, ScrollView, Text, View } from "react-native";
 import Pressable from "@/components/ui/guarded-pressable";
@@ -11,7 +12,6 @@ import RecentWorkout from "@/components/home/recent-workout";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import WeekCalendar from "@/components/week-calendar";
 import { useStreak } from "@/contexts/streak-context";
-import { getHomeStatsQueryFn, getWorkoutCalendarDatesQueryFn } from "@/lib/api";
 import { useAppThemeColor } from "@/theme/app-theme";
 
 const logo = require("../../../../assets/images/app-images/logo.png");
@@ -28,32 +28,13 @@ export default function HomePage() {
 
     const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
 
-    const currentWeekStart = startOfWeek(new Date());
-    const calendarStart = subWeeks(currentWeekStart, 2);
-    const calendarEnd = addWeeks(currentWeekStart, 1);
-
-    const {
-        data: stats,
-        isPending,
-        isError: statsError,
-        refetch: retryStats,
-    } = useQuery({
-        queryKey: ["home-stats", selectedDate],
-        queryFn: () => getHomeStatsQueryFn(selectedDate),
-    });
     const {
         data,
+        isPending,
         isError: calendarError,
         refetch: retryCalendar,
-    } = useQuery({
-        queryKey: [
-            "workout-calendar",
-            calendarStart.toISOString(),
-            calendarEnd.toISOString(),
-        ],
-        queryFn: () =>
-            getWorkoutCalendarDatesQueryFn(calendarStart, calendarEnd),
-    });
+    } = useWorkoutCalendar();
+    const stats = calendarStats(data, selectedDate);
 
     const workoutDates = data?.workoutDates
         ? data.workoutDates.map((dateStr) => new Date(dateStr))
@@ -109,7 +90,7 @@ export default function HomePage() {
                     value={selectedDate}
                 />
 
-                {calendarError && (
+                {calendarError && data && (
                     <Pressable
                         onPress={() => {
                             void retryCalendar();
@@ -121,12 +102,12 @@ export default function HomePage() {
                         </Text>
                     </Pressable>
                 )}
-                {statsError ? (
+                {calendarError && !data ? (
                     <EmptyState
                         className="mt-3"
                         message="Could not load your stats"
                         onRetry={() => {
-                            void retryStats();
+                            void retryCalendar();
                         }}
                     />
                 ) : (

@@ -69,9 +69,15 @@ const Pressable = forwardRef<
       disabled,
       tapGuardInterval,
     );
+    // NativeWind consumes cssInterop=false on the outer custom component.
+    // Set it again at the native boundary to preserve Pressable style callbacks.
+    const nativeProps =
+      typeof props.style === "function"
+        ? { ...props, cssInterop: false as const }
+        : props;
     return (
       <NativePressable
-        {...props}
+        {...nativeProps}
         ref={ref}
         onPress={handlePress}
         disabled={Boolean(disabled || pending)}

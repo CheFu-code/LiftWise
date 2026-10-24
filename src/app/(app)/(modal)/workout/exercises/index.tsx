@@ -4,7 +4,7 @@ import { useExerciseBookmarks } from "@/hooks/use-exercise-bookmarks";
 import { useAuth } from "@/lib/chefu-auth";
 import { workoutDefaults } from "@/lib/workout-defaults";
 import { useWorkoutDraft } from "@/contexts/workout-draft-context";
-import { useDebounce } from "@/hooks/use-debounce";
+import { filterWorkouts } from "@/lib/workout-search";
 import { ExerciseItem, getExercisesQueryFn } from "@/lib/api";
 import { useAppThemeColor } from "@/theme/app-theme";
 import { useQuery } from "@tanstack/react-query";
@@ -19,22 +19,23 @@ const Index = () => {
     const [savedOnly, setSavedOnly] = useState(false);
     const router = useRouter();
     const [query, setQuery] = useState("");
-    const search = useDebounce<string>(query);
     const muted = useAppThemeColor("mutedForeground");
     const primary = useAppThemeColor("primary");
 
     const [selectedExercises, setSelectedExercises] = useWorkoutDraft();
 
     const {
-        data: exercises = [],
+        data: catalogue,
         isError,
         isPending,
         isRefetching,
         refetch,
     } = useQuery({
-        queryKey: ["exercises", search],
-        queryFn: () => getExercisesQueryFn(search),
+        queryKey: ["exercises"],
+        queryFn: () => getExercisesQueryFn(),
+        select: (catalogue) => filterWorkouts(catalogue, query),
     });
+    const exercises = catalogue ?? [];
 
     const toggleExercise = (exercise: ExerciseItem) => {
         setSelectedExercises((prev) =>
@@ -104,7 +105,7 @@ const Index = () => {
             }
             isPending={isPending}
             muted={muted}
-            isError={isError}
+            isError={isError && catalogue === undefined}
             refetch={refetch}
             router={router}
             query={query}

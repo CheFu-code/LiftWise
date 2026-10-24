@@ -122,7 +122,6 @@ export default function Welcome() {
                     </View>
 
                     <View style={[styles.actions, wide && styles.wideActions]}>
-                        {/* Keep Pressable's style callback outside NativeWind's style resolver. */}
                         <Pressable
                             cssInterop={false}
                             accessibilityRole="button"
@@ -135,13 +134,6 @@ export default function Welcome() {
                             <Text style={styles.startButtonText}>
                                 Let's build your routine
                             </Text>
-                            <View style={styles.buttonArrow}>
-                                <Feather
-                                    name="arrow-right"
-                                    size={layout.iconSize}
-                                    color={colors.blue}
-                                />
-                            </View>
                         </Pressable>
                         <View style={styles.signInRow}>
                             <Text style={styles.signInPrompt}>
@@ -157,11 +149,6 @@ export default function Welcome() {
                                 ]}
                             >
                                 <Text style={styles.signInText}>Sign in</Text>
-                                <Feather
-                                    name="arrow-up-right"
-                                    size={layout.smallIconSize}
-                                    color={colors.ink}
-                                />
                             </Pressable>
                         </View>
                     </View>

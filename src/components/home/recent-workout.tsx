@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { Image, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import Image from "@/components/ui/cached-image";
 import Pressable from "@/components/ui/guarded-pressable";
 
 import EmptyState from "@/components/ui/empty-state";
@@ -29,7 +30,7 @@ export default function RecentWorkout() {
 
       {isPending ? (
         <Skeleton className="min-h-[88px] w-full rounded-xl shadow-xs" />
-      ) : isError ? (
+      ) : isError && !data ? (
         <EmptyState
           message="Could not load recent workouts"
           onRetry={() => {

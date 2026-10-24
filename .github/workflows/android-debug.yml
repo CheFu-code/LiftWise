@@ -22,6 +22,7 @@ jobs:
       CI: "1"
       EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL || 'https://api.chefu.co.za' }}
       EXPO_PUBLIC_ACCOUNT_APP_URL: ${{ vars.EXPO_PUBLIC_ACCOUNT_APP_URL || 'https://myaccount.chefu.co.za' }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
     steps:
       - name: Check out repository

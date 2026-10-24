@@ -8,6 +8,7 @@ export function useExerciseBookmarks() {
   const { userId } = useAuth();
   const { toast, showToast, dismissToast } = useToast();
   const pendingIds = useRef(new Set<string>());
+  const needsRefresh = useRef(false);
   const client = useQueryClient();
   const queryKey = ["exercise-bookmarks", userId];
   const mutationKey = ["update-exercise-bookmark", userId];
@@ -32,6 +33,7 @@ export function useExerciseBookmarks() {
       return { wasSaved };
     },
     onError: (_error, { id, saved }, context) => {
+      needsRefresh.current = true;
       // Roll back this exercise only; preserve other in-flight bookmark changes.
       if (context && client.getQueryData(queryKey) !== undefined) {
         client.setQueryData<string[]>(queryKey, (current = []) =>
@@ -51,13 +53,17 @@ export function useExerciseBookmarks() {
       // Refetch after the last write so it cannot overwrite another optimistic tick.
       if (
         client.isMutating({ mutationKey }) === 1 &&
+        needsRefresh.current &&
         client.getQueryData(queryKey) !== undefined
-      )
+      ) {
+        needsRefresh.current = false;
         void client.invalidateQueries({ queryKey });
+      }
     },
   });
   return {
     ...query,
+    isError: query.isError && query.data === undefined,
     ids: query.data ?? [],
     saving: mutation.isPending,
     toast,
@@ -66,7 +72,7 @@ export function useExerciseBookmarks() {
       if (
         !userId ||
         query.isPending ||
-        query.isError ||
+        (query.isError && query.data === undefined) ||
         pendingIds.current.has(id)
       )
         return;

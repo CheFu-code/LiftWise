@@ -3,6 +3,9 @@ import type { WorkoutDetail, WorkoutListItem } from "./api";
 
 type Change = { image: string } | { exerciseIds: string[] } | { deleted: true };
 const pending = new WeakMap<QueryClient, number>();
+const refreshNeeded = new WeakMap<QueryClient, boolean>();
+export const hasPendingWorkoutChanges = (client: QueryClient) =>
+  (pending.get(client) ?? 0) > 0;
 
 // Update every cached list (including Home) and the open detail together.
 export async function optimisticWorkoutChange(
@@ -13,6 +16,12 @@ export async function optimisticWorkoutChange(
   await client.cancelQueries({ queryKey: ["workouts"] });
   const undo: (() => void)[] = [];
   const queries = client.getQueryCache().findAll({ queryKey: ["workouts"] });
+  const originals = new Map(
+    queries.map((query) => [
+      query,
+      query.state.data as WorkoutDetail | WorkoutListItem[] | null | undefined,
+    ]),
+  );
   for (const query of queries) {
     const previous = query.state.data as
       WorkoutDetail | WorkoutListItem[] | null | undefined;
@@ -97,21 +106,112 @@ export async function optimisticWorkoutChange(
   }
   pending.set(client, (pending.get(client) ?? 0) + 1);
   let settled = false;
-  return Object.assign(() => undo.forEach((restore) => restore()), {
-    settle() {
-      if (settled) return;
-      settled = true;
-      const remaining = (pending.get(client) ?? 1) - 1;
-      pending.set(client, remaining);
-      // Refetch only after every optimistic workout write has settled.
-      if (
-        remaining === 0 &&
-        client
-          .getQueryCache()
-          .findAll({ queryKey: ["workouts"] })
-          .some((query) => queries.includes(query))
-      )
-        void client.invalidateQueries({ queryKey: ["workouts"] });
+  return Object.assign(
+    () => {
+      refreshNeeded.set(client, true);
+      undo.forEach((restore) => restore());
     },
-  });
+    {
+      confirmImage(image: string) {
+        if (!("image" in change)) return;
+        for (const query of queries) {
+          if (
+            client
+              .getQueryCache()
+              .find({ queryKey: query.queryKey, exact: true }) !== query
+          )
+            continue;
+          client.setQueryData(
+            query.queryKey,
+            (data: WorkoutDetail | WorkoutListItem[] | undefined) => {
+              const original = originals.get(query);
+              if (Array.isArray(data))
+                return data.map((item) =>
+                  item.id === id &&
+                  (item.image === change.image ||
+                    (Array.isArray(original) &&
+                      item.image ===
+                        original.find((entry) => entry.id === id)?.image))
+                    ? { ...item, image }
+                    : item,
+                );
+              return data?.id === id &&
+                (data.image === change.image ||
+                  (original &&
+                    !Array.isArray(original) &&
+                    data.image === original.image))
+                ? { ...data, image }
+                : data;
+            },
+          );
+        }
+      },
+      confirmOrder() {
+        if (!("exerciseIds" in change)) return;
+        for (const query of queries) {
+          if (
+            client
+              .getQueryCache()
+              .find({ queryKey: query.queryKey, exact: true }) !== query
+          )
+            continue;
+          client.setQueryData(
+            query.queryKey,
+            (data: WorkoutDetail | WorkoutListItem[] | null | undefined) => {
+              if (!data || Array.isArray(data) || data.id !== id) return data;
+              const byId = new Map(
+                data.exercises.map((exercise) => [exercise.id, exercise]),
+              );
+              if (
+                data.exercises.length !== change.exerciseIds.length ||
+                change.exerciseIds.some((exerciseId) => !byId.has(exerciseId))
+              )
+                return data;
+              return {
+                ...data,
+                exercises: change.exerciseIds.map((exerciseId) =>
+                  byId.get(exerciseId)!,
+                ),
+              };
+            },
+          );
+        }
+      },
+      confirmDeletion() {
+        if (
+          !("deleted" in change) ||
+          !queries.some(
+            (query) =>
+              client
+                .getQueryCache()
+                .find({ queryKey: query.queryKey, exact: true }) === query,
+          )
+        )
+          return;
+        client.setQueriesData({ queryKey: ["workouts"] }, (data: unknown) =>
+          Array.isArray(data)
+            ? data.filter((item: WorkoutListItem) => item.id !== id)
+            : data,
+        );
+      },
+      settle() {
+        if (settled) return;
+        settled = true;
+        const remaining = (pending.get(client) ?? 1) - 1;
+        pending.set(client, remaining);
+        // Confirmed local changes need no extra reads. A rollback reconciles once.
+        if (
+          remaining === 0 &&
+          refreshNeeded.get(client) &&
+          client
+            .getQueryCache()
+            .findAll({ queryKey: ["workouts"] })
+            .some((query) => queries.includes(query))
+        ) {
+          refreshNeeded.delete(client);
+          void client.invalidateQueries({ queryKey: ["workouts"] });
+        }
+      },
+    },
+  );
 }

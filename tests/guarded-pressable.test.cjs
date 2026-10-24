@@ -164,6 +164,23 @@ test("counter buttons support intentional faster repeats and preserve native sty
   assert.equal(button.props.accessibilityState.selected, true);
 });
 
+test("style callbacks bypass NativeWind at the native boundary after the outer flag is consumed", () => {
+  const state = setup();
+  const style = ({ pressed }) => ({
+    backgroundColor: pressed ? "navy" : "blue",
+  });
+  const button = state.render({ style, onPress() {} });
+  assert.equal(button.props.cssInterop, false);
+  assert.equal(button.props.style, style);
+  const classButton = state.render({
+    className: "bg-primary",
+    style: { minHeight: 48 },
+    onPress() {},
+  });
+  assert.notEqual(classButton.props.cssInterop, false);
+  assert.equal(classButton.props.className, "bg-primary");
+});
+
 test("app pressable controls consistently use the shared guard", () => {
   function check(directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {

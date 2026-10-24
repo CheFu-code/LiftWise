@@ -16,12 +16,12 @@ import {
 import {
     AppState,
     ActivityIndicator,
-    Image,
     ScrollView,
     Switch,
     Text,
     View,
 } from "react-native";
+import Image from "@/components/ui/cached-image";
 import Pressable from "@/components/ui/guarded-pressable";
 
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
@@ -48,12 +48,18 @@ export default function ProfilePage() {
     const refreshRef = useRef(refreshUser);
     refreshRef.current = refreshUser;
     const refreshing = useRef(false);
+    const lastAccountRefresh = useRef(0);
     const [refreshError, setRefreshError] = useState(false);
-    const refreshAccount = useCallback(async () => {
-        if (refreshing.current) return;
+    const refreshAccount = useCallback(async (force = false) => {
+        if (
+            refreshing.current ||
+            (!force && Date.now() - lastAccountRefresh.current < 60_000)
+        )
+            return;
         refreshing.current = true;
         try {
             await refreshRef.current();
+            lastAccountRefresh.current = Date.now();
             setRefreshError(false);
         } catch {
             setRefreshError(true);
@@ -65,7 +71,7 @@ export default function ProfilePage() {
         useCallback(() => {
             void refreshAccount();
             const listener = AppState.addEventListener("change", (state) => {
-                if (state === "active") void refreshAccount();
+                if (state === "active") void refreshAccount(true);
             });
             return () => listener.remove();
         }, [refreshAccount]),
@@ -210,7 +216,7 @@ export default function ProfilePage() {
                 {refreshError && (
                     <Pressable
                         onPress={() => {
-                            void refreshAccount();
+                            void refreshAccount(true);
                         }}
                         className="mt-3 p-2"
                     >
