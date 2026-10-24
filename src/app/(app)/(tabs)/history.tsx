@@ -1,3 +1,4 @@
+import PendingWorkouts from "@/components/pending-workouts";
 import EmptyState from "@/components/ui/empty-state";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Skeleton from "@/components/ui/skeleton";
@@ -106,6 +107,7 @@ const History = () => {
                 }
                 ListHeaderComponent={
                     <View>
+                        <PendingWorkouts />
                         <Text className="pt-3 font-inter-bold text-2xl text-foreground">
                             History
                         </Text>

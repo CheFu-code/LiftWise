@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 export function useWorkoutTimer() {
-  const [startedAt] = useState(() => Date.now());
+  const [startedAt, setStartedAt] = useState(() => Date.now());
   const [elapsed, setElapsed] = useState(0);
   const [rest, setRest] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -55,6 +55,15 @@ export function useWorkoutTimer() {
     setRest(0);
   };
 
+  const restore = (snapshot: { startedAt: number; elapsed: number; paused: boolean; savedAt: number }) => {
+    setStartedAt(snapshot.startedAt);
+    accumulatedRef.current = snapshot.elapsed + (snapshot.paused ? 0 : Math.max(0, Date.now() - snapshot.savedAt) / 1000);
+    lastResumeAt.current = Date.now();
+    isPausedRef.current = snapshot.paused;
+    setIsPaused(snapshot.paused);
+    setElapsed(accumulatedRef.current);
+  };
+
   return {
     elapsed,
     isPaused,
@@ -65,5 +74,6 @@ export function useWorkoutTimer() {
     skipRest,
     startRest,
     togglePause,
+    restore,
   };
 }

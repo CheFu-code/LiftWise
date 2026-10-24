@@ -1,4 +1,5 @@
 import WorkoutReminderSync from "@/components/workout-reminder-sync";
+import WorkoutCompletionSync from "@/components/workout-completion-sync";
 import { createQueryClient } from "@/lib/query-client";
 import { useQueryPersistence } from "@/hooks/use-query-persistence";
 import { ChefuAuthProvider, useAuth } from "@/lib/chefu-auth";
@@ -132,6 +133,7 @@ function RootNavigation() {
                     )}
                     <ActionModalProvider>
                         <WorkoutReminderSync />
+                        <WorkoutCompletionSync />
                         <Stack
                             screenOptions={{
                                 headerShown: false,

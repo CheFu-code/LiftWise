@@ -202,7 +202,7 @@ const SingleExercise = () => {
                             size={21}
                         />
                         <Text className="ml-3 flex-1 font-inter-semibold text-[14px] text-primary">
-                            Ask AI Coach
+                            Ask Quantum AI Coach
                         </Text>
                         <Feather
                             color={primary}

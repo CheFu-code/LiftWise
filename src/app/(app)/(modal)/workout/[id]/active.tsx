@@ -8,7 +8,6 @@ import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Skeleton from "@/components/ui/skeleton";
 import { useWorkoutTimer } from "@/hooks/use-workout-timer";
 import {
-    createWorkoutSessionMutationFn,
     getWorkoutQueryFn,
     SaveSessionSet,
     WorkoutDetail,
@@ -20,7 +19,9 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { AppState, Text, TextInput, View } from "react-native";
+import * as Crypto from "expo-crypto";
+import { readWorkoutJournal, saveWorkoutDraft, discardWorkoutDraft, enqueueWorkoutCompletion } from "@/lib/workout-journal";
 import Pressable from "@/components/ui/guarded-pressable";
 import {
     KeyboardAwareScrollView,
@@ -37,7 +38,7 @@ const ActiveSessionPage = () => {
     const showModal = useActionModal();
     const { showToast } = useToast();
     const { session } = useAuth();
-    const [weightUnit] = useState<WeightUnit>(
+    const [weightUnit, setWeightUnit] = useState<WeightUnit>(
         () => session?.onboardingProfile?.weightUnit ?? "kg",
     );
     const navigation = useNavigation();
@@ -55,6 +56,51 @@ const ActiveSessionPage = () => {
         Record<string, { reps?: string; weight?: string }>
     >({});
     const allowLeave = useRef(false);
+    const requestId = useRef(Crypto.randomUUID());
+    const [draftReady, setDraftReady] = useState(false);
+    const [draftError, setDraftError] = useState(false);
+    const latest = useRef({ completed, timer, weightUnit });
+    latest.current = { completed, timer, weightUnit };
+    const checkpoint = useRef(() => Promise.resolve());
+    checkpoint.current = async () => {
+        const uid = session?.user.uid;
+        if (!uid || !draftReady || allowLeave.current) return;
+        const current = latest.current;
+        await saveWorkoutDraft(uid, {
+            requestId: requestId.current, workoutId: id,
+            startedAt: current.timer.startedAt, elapsed: current.timer.elapsed,
+            paused: current.timer.isPaused, savedAt: Date.now(),
+            weightUnit: current.weightUnit, completed: current.completed,
+            values: { ...valuesRef.current },
+        });
+    };
+    useEffect(() => {
+        const uid = session?.user.uid;
+        if (!uid || !id) return;
+        let active = true;
+        void readWorkoutJournal(uid).then((journal) => {
+            if (!active) return;
+            const draft = journal.drafts[id];
+            if (draft) {
+                requestId.current = draft.requestId;
+                valuesRef.current = draft.values;
+                setCompleted(draft.completed);
+                setWeightUnit(draft.weightUnit);
+                timer.restore(draft);
+                showToast("Your workout progress has been restored.");
+            }
+            setDraftReady(true);
+        }).catch(() => { if (active) setDraftError(true); });
+        return () => { active = false; };
+    }, [id, session?.user.uid]);
+    useEffect(() => {
+        if (!draftReady) return;
+        const persist = () => void checkpoint.current().catch(() => showToast("Could not save progress on this device. Keep this workout open and try again."));
+        const delay = setTimeout(persist, 500);
+        const interval = setInterval(persist, 30_000);
+        const app = AppState.addEventListener("change", (state) => { if (state !== "active") persist(); });
+        return () => { clearTimeout(delay); clearInterval(interval); app.remove(); };
+    }, [draftReady, completed, timer.isPaused]);
 
     const {
         data: workout,
@@ -98,7 +144,10 @@ const ActiveSessionPage = () => {
                     });
                 }
             });
-            await createWorkoutSessionMutationFn({
+            const uid = session?.user.uid;
+            if (!uid) throw new Error("Sign in to save this workout.");
+            await enqueueWorkoutCompletion(uid, {
+                requestId: requestId.current,
                 weightUnit: "kg",
                 workoutId: workout.id,
                 startedAt: new Date(timer.startedAt).toISOString(),
@@ -107,18 +156,7 @@ const ActiveSessionPage = () => {
                 sets,
             });
 
-            void Promise.all(
-                ["history", "history-pages", "workout-calendar", "streak"].map(
-                    (queryKey) =>
-                        queryClient.invalidateQueries({
-                            queryKey: [queryKey],
-                            // Completed session details are immutable; only list/summary data changes.
-                            predicate: (query) =>
-                                queryKey !== "history" ||
-                                typeof query.queryKey[1] !== "string",
-                        }),
-                ),
-            );
+            showToast("Workout saved on this device. Syncing when connected.");
             return true;
         } catch (cause) {
             showToast(
@@ -152,7 +190,8 @@ const ActiveSessionPage = () => {
                 if (!wasPaused) timer.resume();
             };
 
-            const leave = () => {
+            const leave = async () => {
+                if (session?.user.uid) await discardWorkoutDraft(session.user.uid, id, requestId.current);
                 confirmationLock.current = false;
                 allowLeave.current = true;
                 navigation.dispatch(event.data.action);
@@ -180,7 +219,7 @@ const ActiveSessionPage = () => {
                         text: "Save & Leave",
                         onPress: async () => {
                             try {
-                                if (await saveSessionRef.current()) leave();
+                                if (await saveSessionRef.current()) await leave();
                             } finally {
                                 confirmationLock.current = false;
                             }
@@ -236,6 +275,7 @@ const ActiveSessionPage = () => {
             ...valuesRef.current[key],
             [field]: value,
         };
+        void checkpoint.current().catch(() => showToast("Could not save your latest change on this device."));
     };
 
     const toggleSet = (exercise: WorkoutExercise, set: number) => {
@@ -247,7 +287,8 @@ const ActiveSessionPage = () => {
         if (!isDone) timer.startRest(exercise.rest ?? 0);
     };
 
-    if (isPending) return <ActiveSkeleton />;
+    if (draftError) return <EmptyState message="Unable to restore workout progress. Restart the app to retry safely." />;
+    if (isPending || !draftReady) return <ActiveSkeleton />;
 
     if (!workout) {
         return (
@@ -268,6 +309,7 @@ const ActiveSessionPage = () => {
                 showsVerticalScrollIndicator={false}
             >
                 <ActiveSession
+                    savedValues={valuesRef.current}
                     isSaving={isSaving}
                     weightUnit={weightUnit}
                     completed={completed}
@@ -286,6 +328,7 @@ const ActiveSessionPage = () => {
 };
 
 type ActiveSessionProps = {
+    savedValues: Record<string, { reps?: string; weight?: string }>;
     isSaving: boolean;
     weightUnit: WeightUnit;
     completed: string[];
@@ -298,6 +341,7 @@ type ActiveSessionProps = {
 };
 
 function ActiveSession({
+    savedValues,
     isSaving,
     weightUnit,
     completed,
@@ -480,9 +524,7 @@ function ActiveSession({
                                                         editable={!isSaving}
                                                         className="mx-1 h-10 flex-1 rounded-lg bg-muted 
                 text-center font-inter text-[13px] text-foreground"
-                                                        defaultValue={String(
-                                                            exercise.reps,
-                                                        )}
+                                                        defaultValue={savedValues[key]?.reps ?? String(exercise.reps)}
                                                         keyboardType="number-pad"
                                                         onChangeText={(value) =>
                                                             recordValue(
