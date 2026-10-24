@@ -2,7 +2,8 @@ import { cn } from "@/lib/utils";
 import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
 import { ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import Animated, { FadeInRight } from "react-native-reanimated";
 
 type OnboardingOptionCardProps = {

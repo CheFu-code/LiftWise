@@ -3,13 +3,13 @@ import {
     AppState,
     Linking,
     Platform,
-    Pressable,
     ScrollView,
     Switch,
     Text,
     TextInput,
     View,
 } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";

@@ -1,13 +1,13 @@
 import {
     FlatList,
     Image,
-    Pressable,
     RefreshControl,
     Text,
     TextInput,
-    TouchableOpacity,
     View,
 } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
+import { TouchableOpacity } from "@/components/ui/guarded-pressable";
 import Button from "@/components/ui/button";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Skeleton from "@/components/ui/skeleton";

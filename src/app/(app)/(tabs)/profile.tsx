@@ -17,12 +17,12 @@ import {
     AppState,
     ActivityIndicator,
     Image,
-    Pressable,
     ScrollView,
     Switch,
     Text,
     View,
 } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import { useAuth } from "@/lib/chefu-auth";

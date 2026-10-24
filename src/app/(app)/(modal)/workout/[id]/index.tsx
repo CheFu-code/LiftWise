@@ -27,11 +27,11 @@ import {
     useWindowDimensions,
     Image,
     Linking,
-    Pressable,
     ScrollView,
     Text,
     View,
 } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const Index = () => {

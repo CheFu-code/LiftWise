@@ -32,6 +32,10 @@ function setup() {
   const dependencies = {
     react,
     "react/jsx-runtime": { jsx: element, jsxs: element },
+    "@/components/ui/guarded-pressable": {
+      __esModule: true,
+      default: "Pressable",
+    },
     "@expo/vector-icons": { Feather: "Feather" },
     "react-native-safe-area-context": { SafeAreaView: "SafeAreaView" },
     "@/theme/app-theme": { useAppThemeColor: (name) => name },

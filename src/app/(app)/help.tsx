@@ -4,14 +4,8 @@ import Constants from "expo-constants";
 import { randomUUID } from "expo-crypto";
 import { useRouter } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Button from "@/components/ui/button";

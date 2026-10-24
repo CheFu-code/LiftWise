@@ -1,7 +1,8 @@
 import { useActionModal } from "@/components/ui/action-modal";
 import { useToast } from "@/components/ui/toast";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, ScrollView, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { Feather } from "@expo/vector-icons";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import GenderStep from "@/components/onboarding/gender-step";

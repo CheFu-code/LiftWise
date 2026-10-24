@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { useExerciseBookmarks } from "@/hooks/use-exercise-bookmarks";
 import { useAuth } from "@/lib/chefu-auth";
 import { workoutDefaults } from "@/lib/workout-defaults";

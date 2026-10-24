@@ -4,12 +4,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
     Image,
-    Pressable,
     ScrollView,
     Text,
     useWindowDimensions,
     View,
 } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 
 import EmptyState from "@/components/ui/empty-state";
 import Skeleton from "@/components/ui/skeleton";

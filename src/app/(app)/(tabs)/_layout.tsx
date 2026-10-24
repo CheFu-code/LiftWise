@@ -2,7 +2,8 @@ import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { Platform, Pressable, View } from "react-native";
+import { Platform, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Scroll Down to see the Native Glass IOS Tab

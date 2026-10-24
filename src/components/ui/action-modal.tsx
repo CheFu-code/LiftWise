@@ -10,12 +10,12 @@ import {
 import {
   Keyboard,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppThemeColor } from "@/theme/app-theme";
 

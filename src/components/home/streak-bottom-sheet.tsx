@@ -10,7 +10,8 @@ import {
   startOfDay,
   startOfWeek,
 } from "date-fns";
-import { Image, Modal, Pressable, Text, View } from "react-native";
+import { Image, Modal, Text, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Button from "@/components/ui/button";

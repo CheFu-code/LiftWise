@@ -1,7 +1,8 @@
 import type { ComponentRef, ReactNode } from "react";
 import { forwardRef, useRef, useState } from "react";
 import type { PressableProps } from "react-native";
-import { ActivityIndicator, Pressable, Text } from "react-native";
+import { ActivityIndicator, Text } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 
 import { cn } from "@/lib/utils";
 import { useAppThemeColor } from "@/theme/app-theme";

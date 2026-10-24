@@ -2,7 +2,8 @@ import { useWelcomeTheme } from "@/components/welcome/welcome.styles";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Image, ScrollView, Text, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Welcome() {

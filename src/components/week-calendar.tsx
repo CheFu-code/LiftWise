@@ -11,13 +11,13 @@ import {
 } from "date-fns";
 import { useRef, useState } from "react";
 import {
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     useWindowDimensions,
     View,
 } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 
 import { useAppThemeColor } from "@/theme/app-theme";
 
@@ -36,7 +36,7 @@ export default function WeekCalendar({
     const [pageWidth, setPageWidth] = useState(width);
     const compact = pageWidth < 360;
     const primary = useAppThemeColor("primary");
-    const primaryForeground = useAppThemeColor("primaryForeground");
+    const selectedBackground = useAppThemeColor("muted");
     const foreground = useAppThemeColor("foreground");
     const mutedForeground = useAppThemeColor("mutedForeground");
     const card = useAppThemeColor("card");
@@ -100,9 +100,10 @@ export default function WeekCalendar({
                                     style={[
                                         styles.weekday,
                                         {
-                                            color: isSelected || isToday
-                                                ? primary
-                                                : mutedForeground,
+                                            color:
+                                                isSelected || isToday
+                                                    ? primary
+                                                    : mutedForeground,
                                             opacity: isFuture ? 0.35 : 1,
                                         },
                                     ]}
@@ -126,7 +127,7 @@ export default function WeekCalendar({
                                         styles.dayCard,
                                         {
                                             backgroundColor: isSelected
-                                                ? primary
+                                                ? selectedBackground
                                                 : card,
                                             borderColor:
                                                 isSelected || isToday
@@ -151,9 +152,7 @@ export default function WeekCalendar({
                                             styles.date,
                                             {
                                                 fontSize: compact ? 16 : 18,
-                                                color: isSelected
-                                                    ? primaryForeground
-                                                    : foreground,
+                                                color: foreground,
                                             },
                                         ]}
                                     >
@@ -167,10 +166,7 @@ export default function WeekCalendar({
                                                         ? styles.workoutDot
                                                         : styles.todayDash,
                                                     {
-                                                        backgroundColor:
-                                                            isSelected
-                                                                ? primaryForeground
-                                                                : primary,
+                                                        backgroundColor: primary,
                                                     },
                                                 ]}
                                             />

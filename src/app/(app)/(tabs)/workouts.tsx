@@ -14,9 +14,9 @@ import {
     RefreshControl,
     Text,
     TextInput,
-    TouchableOpacity,
     View,
 } from "react-native";
+import { TouchableOpacity } from "@/components/ui/guarded-pressable";
 
 const Workouts = () => {
     const router = useRouter();

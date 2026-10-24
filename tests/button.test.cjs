@@ -26,6 +26,10 @@ function setup() {
       },
     },
     "react/jsx-runtime": { jsx: element, jsxs: element },
+    "@/components/ui/guarded-pressable": {
+      __esModule: true,
+      default: "Pressable",
+    },
     "react-native": {
       ActivityIndicator: "Spinner",
       Pressable: "Pressable",

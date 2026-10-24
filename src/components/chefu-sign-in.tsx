@@ -6,13 +6,13 @@ import { useRef, useState } from "react";
 import {
     ActivityIndicator,
     Image,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     useWindowDimensions,
     View,
 } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 
 export default function ChefuSignIn({
     register = false,

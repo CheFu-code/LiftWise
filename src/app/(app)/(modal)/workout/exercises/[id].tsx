@@ -9,7 +9,8 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Image, ScrollView, Text, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -128,8 +129,8 @@ const SingleExercise = () => {
                                     bookmarks.isError
                                         ? "Retry loading saved exercises"
                                         : bookmarks.ids.includes(exercise.id)
-                                            ? "Remove saved exercise"
-                                            : "Save exercise"
+                                          ? "Remove saved exercise"
+                                          : "Save exercise"
                                 }
                                 accessibilityState={{
                                     selected: bookmarks.ids.includes(

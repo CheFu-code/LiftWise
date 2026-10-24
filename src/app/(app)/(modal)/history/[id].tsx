@@ -10,7 +10,8 @@ import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Image, ScrollView, Text, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 
 const SingleHistory = () => {
     const { session } = useAuth();

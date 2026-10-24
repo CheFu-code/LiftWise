@@ -2,7 +2,8 @@ import EmptyState from "@/components/ui/empty-state";
 import { useQuery } from "@tanstack/react-query";
 import { addWeeks, startOfDay, startOfWeek, subWeeks } from "date-fns";
 import { useState } from "react";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Image, ScrollView, Text, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 
 import HomeStats from "@/components/home/home-stats";
 import MyWorkouts from "@/components/home/my-workouts";

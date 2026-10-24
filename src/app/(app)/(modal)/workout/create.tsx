@@ -14,11 +14,11 @@ import {
   ActivityIndicator,
   Image,
   Linking,
-  Pressable,
   Text,
   TextInput,
   View,
 } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 import {
   KeyboardAwareScrollView,
   KeyboardToolbar,
@@ -324,6 +324,7 @@ const CreateWorkout = () => {
 
                       <View className="flex-row items-center justify-center gap-3">
                         <Pressable
+                          tapGuardInterval={150}
                           className="h-8 w-8 items-center justify-center rounded-lg bg-muted"
                           onPress={() =>
                             updateExercise(exercise.id, field, -step)
@@ -335,6 +336,7 @@ const CreateWorkout = () => {
                           {value}
                         </Text>
                         <Pressable
+                          tapGuardInterval={150}
                           className="h-8 w-8 items-center justify-center rounded-lg bg-muted"
                           onPress={() =>
                             updateExercise(exercise.id, field, step)

@@ -10,7 +10,8 @@ import { useQuery } from "@tanstack/react-query";
 import { isSameDay, startOfDay } from "date-fns";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { FlatList, Image, Pressable, Text, View } from "react-native";
+import { FlatList, Image, Text, View } from "react-native";
+import Pressable from "@/components/ui/guarded-pressable";
 
 const History = () => {
     const router = useRouter();
