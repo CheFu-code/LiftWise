@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build Signed APK and AAB
@@ -24,63 +28,115 @@ jobs:
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
+      # Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      # Install Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      # Install Java without early Gradle caching
+      - name: Setup Java
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
 
-      - name: Set up Android SDK
+      # Install Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # Install project dependencies
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate native Android project
+      # Generate native Android project if missing
+      - name: Generate Android project
         run: |
           if [ ! -f android/gradlew ]; then
+            echo "Generating Android project..."
             npx expo prebuild \
               --platform android \
               --non-interactive
+          else
+            echo "Android project already exists."
           fi
 
-      - name: Restore release keystore
+      # Gradle cache only after native generation
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      # Validate signing secrets
+      - name: Validate signing credentials
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || {
+            echo "::error::Missing ANDROID_KEYSTORE_BASE64"
+            exit 1
+          }
+
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || {
+            echo "::error::Missing ANDROID_KEYSTORE_PASSWORD"
+            exit 1
+          }
+
+          test -n "$ANDROID_KEY_ALIAS" || {
+            echo "::error::Missing ANDROID_KEY_ALIAS"
+            exit 1
+          }
+
+          test -n "$ANDROID_KEY_PASSWORD" || {
+            echo "::error::Missing ANDROID_KEY_PASSWORD"
+            exit 1
+          }
+
+      # Restore the original signing keystore
+      - name: Restore Android keystore
         run: |
           printf '%s' "$ANDROID_KEYSTORE_BASE64" \
             | base64 --decode \
             > "$RUNNER_TEMP/liftwise-release.jks"
 
-          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/liftwise-release.jks" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/liftwise-release.jks" \
+            >> "$GITHUB_ENV"
 
-      - name: Configure release signing
+      # Configure signing inside Gradle
+      - name: Configure Android release signing
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
 
           path = Path("android/app/build.gradle")
+
+          if not path.exists():
+              raise SystemExit("Android build.gradle not found")
+
           source = path.read_text()
 
           if "signingConfigs {" not in source:
-              raise SystemExit("Android signingConfigs block not found")
+              raise SystemExit("signingConfigs block not found")
 
           signing = """
           signingConfigs {
               release {
-                  storeFile file(System.getenv("ANDROID_KEYSTORE_FILE"))
-                  storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                  keyAlias System.getenv("ANDROID_KEY_ALIAS")
-                  keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                  storeFile file(
+                      System.getenv("ANDROID_KEYSTORE_FILE")
+                  )
+                  storePassword System.getenv(
+                      "ANDROID_KEYSTORE_PASSWORD"
+                  )
+                  keyAlias System.getenv(
+                      "ANDROID_KEY_ALIAS"
+                  )
+                  keyPassword System.getenv(
+                      "ANDROID_KEY_PASSWORD"
+                  )
               }
           """
 
@@ -90,11 +146,18 @@ jobs:
               1
           )
 
-          head, separator, tail = source.partition("buildTypes {")
-          if not separator:
-              raise SystemExit("Android buildTypes block not found")
+          head, separator, tail = source.partition(
+              "buildTypes {"
+          )
 
-          match = re.search(r'\brelease\s*\{', tail)
+          if not separator:
+              raise SystemExit("buildTypes block not found")
+
+          match = re.search(
+              r'\brelease\s*\{',
+              tail
+          )
+
           if not match:
               raise SystemExit("Release build type not found")
 
@@ -108,17 +171,24 @@ jobs:
                   1
               )
           elif "signingConfig signingConfigs.release" not in after:
-              after = "\n signingConfig signingConfigs.release\n" + after
+              after = (
+                  "\n signingConfig signingConfigs.release\n"
+                  + after
+              )
 
           path.write_text(
               head + separator + before + after
           )
+
+          print("Release signing configured.")
           PY
 
+      # Prepare Gradle
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      - name: Build signed APK and AAB
+      # Build both release formats
+      - name: Build release APK and AAB
         working-directory: android
         run: |
           ./gradlew \
@@ -127,7 +197,8 @@ jobs:
             --no-daemon \
             --stacktrace
 
-      - name: Collect artifacts
+      # Collect final artifacts
+      - name: Collect release artifacts
         run: |
           mkdir -p release
 
@@ -137,9 +208,11 @@ jobs:
           cp android/app/build/outputs/bundle/release/*.aab \
             release/LiftWise-release.aab
 
+          echo "Release files:"
           ls -lh release/
 
-      - name: Upload APK
+      # Upload APK
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: LiftWise-Release-APK
@@ -147,10 +220,25 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Upload AAB
+      # Upload AAB
+      - name: Upload Release AAB
         uses: actions/upload-artifact@v4
         with:
           name: LiftWise-Release-AAB
           path: release/LiftWise-release.aab
           retention-days: 30
           if-no-files-found: error
+
+      # Build summary
+      - name: Build summary
+        run: |
+          echo "## LiftWise Android Build" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Both Android release formats built successfully." \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Signed APK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Signed AAB" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download both from the Actions artifacts." \
+            >> "$GITHUB_STEP_SUMMARY"
