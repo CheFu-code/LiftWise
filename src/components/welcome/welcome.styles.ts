@@ -105,8 +105,8 @@ const createStyles = (
     headline: {
       fontFamily: "Inter_700Bold",
       fontSize: layout.headlineSize,
-      lineHeight: Math.ceil(layout.headlineSize * 1.14),
-      letterSpacing: -layout.headlineSize * 0.04,
+      lineHeight: Math.ceil(layout.headlineSize * 1.16),
+      letterSpacing: -layout.headlineSize * 0.025,
       color: colors.ink,
     },
     accent: { color: colors.accent },

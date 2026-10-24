@@ -48,7 +48,6 @@ test("content and rotated illustration fit small phones, tablets, and desktop si
 test("short landscape screens and large accessibility text get a scrollable single column", () => {
   assert.equal(getWelcomeLayout(1024, 390).wide, false);
   assert.equal(getWelcomeLayout(1024, 844, 2).wide, false);
-  assert.equal(getWelcomeLayout(320, 568, 2).headlineBreak, " ");
   assert.equal(getWelcomeLayout(1440, 900).wide, true);
 });
 
@@ -60,5 +59,5 @@ test("resizing updates content, text, spacing and illustration without unbounded
   assert.ok(tablet.artScale > phone.artScale);
   assert.ok(tablet.padding > phone.padding);
   assert.equal(desktop.contentWidth, getWelcomeLayout(3000, 1200).contentWidth);
-  assert.ok(desktop.headlineSize <= 72);
+  assert.ok(desktop.headlineSize <= 60);
 });

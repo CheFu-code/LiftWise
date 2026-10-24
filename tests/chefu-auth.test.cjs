@@ -129,7 +129,7 @@ test("invalid refresh grants clear session; network failures preserve it for ret
   }
 });
 
-function signInFlow(result, sessionOverrides = {}) {
+function signInFlow(result, sessionOverrides = {}, profileOverrides = {}) {
   const calls = { exchange: 0, save: 0 };
   const auth = load("../src/lib/chefu-auth.ts", {
     "expo-auth-session": {
@@ -172,11 +172,16 @@ function signInFlow(result, sessionOverrides = {}) {
     },
     "./auth-client": { API_URL: "http://localhost:8081" },
     "./validations/onboarding-validation": {
-      onboardingValuesSchema: { safeParse: () => ({ success: false }) },
+      onboardingValuesSchema: {
+        safeParse: (value) => ({
+          success: !!(value?.gender && value?.goal && value?.experience),
+        }),
+      },
     },
     "./onboarding-profile": {
       fetchOnboardingProfile: async () => ({ gender: "female" }),
       postOnboardingProfile: async () => {},
+      ...profileOverrides,
     },
     "./chefu-session": {
       CLIENT_ID: "liftwise-mobile",
@@ -281,4 +286,115 @@ test("a profile refresh cannot restore a signed-out account", async () => {
   );
   assert.equal(await value.refreshUser(), null);
   assert.equal(saved, false);
+});
+
+const completeProfile = {
+  gender: "female",
+  goal: "maintain",
+  experience: "beginner",
+  weightUnit: "kg",
+};
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+test("preference changes publish before the network responds and failure restores them without losing rotated tokens", async () => {
+  let current = {
+    token: "old",
+    user: { uid: "alice", gender: "female" },
+    onboardingProfile: completeProfile,
+  };
+  let reject;
+  const { value } = signInFlow(
+    {},
+    {
+      getToken: async () => "old",
+      readSession: async () => current,
+      saveSession: async (next) => {
+        current = next;
+      },
+    },
+    {
+      postOnboardingProfile: () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        }),
+    },
+  );
+  const updated = { ...completeProfile, weightUnit: "lb" };
+  const saving = value.saveOnboardingProfile(updated);
+  await flush();
+  assert.equal(current.onboardingProfile.weightUnit, "lb");
+  current = { ...current, token: "rotated" };
+  reject(new Error("Offline"));
+  await assert.rejects(saving, /Offline/);
+  assert.equal(current.onboardingProfile.weightUnit, "kg");
+  assert.equal(current.token, "rotated");
+});
+
+test("pending preference writes cannot race each other or restore a signed-out account", async () => {
+  let current = {
+    token: "old",
+    user: { uid: "alice" },
+    onboardingProfile: completeProfile,
+  };
+  let reject;
+  const { value } = signInFlow(
+    {},
+    {
+      getToken: async () => "old",
+      readSession: async () => current,
+      saveSession: async (next) => {
+        current = next;
+      },
+    },
+    {
+      postOnboardingProfile: () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        }),
+    },
+  );
+  const saving = value.saveOnboardingProfile({
+    ...completeProfile,
+    weightUnit: "lb",
+  });
+  await flush();
+  await assert.rejects(
+    value.saveOnboardingProfile(completeProfile),
+    /still saving/,
+  );
+  current = null;
+  reject(new Error("Offline"));
+  await assert.rejects(saving);
+  assert.equal(current, null);
+});
+
+test("first-time onboarding only completes after the server accepts the answers", async () => {
+  let current = {
+    token: "old",
+    user: { uid: "alice" },
+    onboardingProfile: { gender: "female" },
+  };
+  let resolve;
+  const { value } = signInFlow(
+    {},
+    {
+      getToken: async () => "old",
+      readSession: async () => current,
+      saveSession: async (next) => {
+        current = next;
+      },
+    },
+    {
+      postOnboardingProfile: () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    },
+  );
+  const saving = value.saveOnboardingProfile(completeProfile);
+  await flush();
+  assert.equal(current.onboardingProfile.experience, undefined);
+  resolve();
+  await saving;
+  assert.equal(current.onboardingProfile.experience, "beginner");
 });

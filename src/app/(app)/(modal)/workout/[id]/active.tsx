@@ -1,7 +1,7 @@
 import { useAuth } from "@/lib/chefu-auth";
 import { fromKilograms, weightInput, type WeightUnit } from "@/lib/weight";
 import { useActionModal } from "@/components/ui/action-modal";
-import LoadingModal from "@/components/loading-modal";
+import { useToast } from "@/components/ui/toast";
 import Button from "@/components/ui/button";
 import EmptyState from "@/components/ui/empty-state";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
@@ -34,6 +34,7 @@ type Timer = ReturnType<typeof useWorkoutTimer>;
 
 const ActiveSessionPage = () => {
     const showModal = useActionModal();
+    const { showToast } = useToast();
     const { session } = useAuth();
     const [weightUnit] = useState<WeightUnit>(
         () => session?.onboardingProfile?.weightUnit ?? "kg",
@@ -45,6 +46,8 @@ const ActiveSessionPage = () => {
 
     const [completed, setCompleted] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState<boolean>(false);
+    const saveLock = useRef(false);
+    const confirmationLock = useRef(false);
     const timer = useWorkoutTimer();
 
     const valuesRef = useRef<
@@ -69,7 +72,8 @@ const ActiveSessionPage = () => {
     );
 
     const saveSession = useCallback(async () => {
-        if (!workout) return false;
+        if (!workout || saveLock.current) return false;
+        saveLock.current = true;
         setIsSaving(true);
         try {
             const sets: SaveSessionSet[] = [];
@@ -102,7 +106,7 @@ const ActiveSessionPage = () => {
                 sets,
             });
 
-            await Promise.all(
+            void Promise.all(
                 ["history", "home-stats", "workout-calendar", "streak"].map(
                     (queryKey) =>
                         queryClient.invalidateQueries({ queryKey: [queryKey] }),
@@ -110,17 +114,15 @@ const ActiveSessionPage = () => {
             );
             return true;
         } catch (cause) {
-            showModal(
-                "Could not save",
-                cause instanceof Error
-                    ? cause.message
-                    : "Check your connection",
+            showToast(
+                "Failed to save workout progress. Your sets are ready to retry.",
             );
             return false;
         } finally {
+            saveLock.current = false;
             setIsSaving(false);
         }
-    }, [completed, queryClient, timer, workout, showModal, weightUnit]);
+    }, [completed, queryClient, timer, workout, showToast, weightUnit]);
 
     const saveSessionRef = useRef(saveSession);
 
@@ -132,15 +134,19 @@ const ActiveSessionPage = () => {
         const unsubscribe = navigation.addListener("beforeRemove", (event) => {
             if (allowLeave.current) return;
             event.preventDefault();
+            if (saveLock.current || confirmationLock.current) return;
+            confirmationLock.current = true;
 
             const wasPaused = timer.isPaused;
             timer.pause();
 
             const resumeTimer = () => {
+                confirmationLock.current = false;
                 if (!wasPaused) timer.resume();
             };
 
             const leave = () => {
+                confirmationLock.current = false;
                 allowLeave.current = true;
                 navigation.dispatch(event.data.action);
             };
@@ -166,7 +172,11 @@ const ActiveSessionPage = () => {
                     {
                         text: "Save & Leave",
                         onPress: async () => {
-                            if (await saveSessionRef.current()) leave();
+                            try {
+                                if (await saveSessionRef.current()) leave();
+                            } finally {
+                                confirmationLock.current = false;
+                            }
                         },
                     },
                 ],
@@ -177,6 +187,8 @@ const ActiveSessionPage = () => {
     }, [completed, navigation, totalSets, showModal]);
 
     const finishWorkout = () => {
+        if (saveLock.current || confirmationLock.current) return;
+        confirmationLock.current = true;
         const wasPaused = timer.isPaused;
         timer.pause();
 
@@ -188,15 +200,20 @@ const ActiveSessionPage = () => {
                     text: "Cancel",
                     style: "cancel",
                     onPress: () => {
+                        confirmationLock.current = false;
                         if (!wasPaused) timer.resume();
                     },
                 },
                 {
                     text: "Finish",
                     onPress: async () => {
-                        if (!(await saveSession())) return;
-                        allowLeave.current = true;
-                        router.replace("/history");
+                        try {
+                            if (!(await saveSession())) return;
+                            allowLeave.current = true;
+                            router.replace("/history");
+                        } finally {
+                            confirmationLock.current = false;
+                        }
                     },
                 },
             ],
@@ -244,6 +261,7 @@ const ActiveSessionPage = () => {
                 showsVerticalScrollIndicator={false}
             >
                 <ActiveSession
+                    isSaving={isSaving}
                     weightUnit={weightUnit}
                     completed={completed}
                     timer={timer}
@@ -255,13 +273,13 @@ const ActiveSessionPage = () => {
                 />
             </KeyboardAwareScrollView>
             <RestTimer timer={timer} />
-            <LoadingModal message="Saving workout..." visible={isSaving} />
             <KeyboardToolbar />
         </SafeAreaScreen>
     );
 };
 
 type ActiveSessionProps = {
+    isSaving: boolean;
     weightUnit: WeightUnit;
     completed: string[];
     onFinish: () => void;
@@ -273,6 +291,7 @@ type ActiveSessionProps = {
 };
 
 function ActiveSession({
+    isSaving,
     weightUnit,
     completed,
     onFinish,
@@ -295,7 +314,10 @@ function ActiveSession({
 
     return (
         <View className="flex-1">
-            <View className="flex-grow px-5 pb-32">
+            <View
+                className="flex-grow px-5 pb-32"
+                pointerEvents={isSaving ? "none" : "auto"}
+            >
                 <View className="flex-row items-start justify-between pt-4">
                     <View>
                         <Text className="font-inter-bold text-[24px] text-foreground">
@@ -306,7 +328,11 @@ function ActiveSession({
                             exercises
                         </Text>
                     </View>
-                    <Pressable accessibilityRole="button" onPress={onLeave}>
+                    <Pressable
+                        accessibilityRole="button"
+                        disabled={isSaving}
+                        onPress={onLeave}
+                    >
                         <Text className="font-inter-semibold text-[13px] text-primary">
                             Leave
                         </Text>
@@ -414,6 +440,7 @@ function ActiveSession({
                                                         {set}
                                                     </Text>
                                                     <TextInput
+                                                        editable={!isSaving}
                                                         className="mx-1 h-10 flex-1 rounded-lg bg-muted 
                 text-center font-inter text-[13px] text-foreground"
                                                         keyboardType="decimal-pad"
@@ -443,6 +470,7 @@ function ActiveSession({
                                                         selectionColor={primary}
                                                     />
                                                     <TextInput
+                                                        editable={!isSaving}
                                                         className="mx-1 h-10 flex-1 rounded-lg bg-muted 
                 text-center font-inter text-[13px] text-foreground"
                                                         defaultValue={String(
@@ -462,6 +490,7 @@ function ActiveSession({
                                                         selectionColor={primary}
                                                     />
                                                     <Pressable
+                                                        disabled={isSaving}
                                                         accessibilityLabel={`Complete set ${set}`}
                                                         className="w-14 items-center"
                                                         onPress={() =>
@@ -495,8 +524,13 @@ function ActiveSession({
                     })}
                 </View>
 
-                <Button className="mt-5" onPress={onFinish} size="sm">
-                    Finish Workout
+                <Button
+                    className="mt-5"
+                    onPress={onFinish}
+                    size="sm"
+                    isLoading={isSaving}
+                >
+                    {isSaving ? "Saving workout…" : "Finish Workout"}
                 </Button>
             </View>
         </View>

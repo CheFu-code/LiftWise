@@ -46,14 +46,12 @@ export function getWelcomeLayout(
     heroPadding,
     illustrationHeight,
     artScale,
-    headlineSize: clamp(32, columnWidth * 0.155, wide ? 72 : 64),
+    headlineSize: clamp(30, columnWidth * 0.12, wide ? 60 : 52),
     bodySize: clamp(14, 14 * scale, 18),
     logoSize: clamp(32, 36 * scale, 46),
     iconSize: clamp(18, 20 * scale, 26),
     smallIconSize: clamp(14, 14 * scale, 18),
     buttonIconSize: clamp(32, 36 * scale, 44),
     buttonMinHeight: clamp(56, 62 * scale, 74),
-    // Let large accessibility text wrap naturally instead of forcing short lines.
-    headlineBreak: fontScale <= 1.3 && columnWidth >= 300 ? "\n" : " ",
   };
 }

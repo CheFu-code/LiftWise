@@ -35,6 +35,7 @@ export default function MyWorkouts() {
     } = useQuery({
         queryFn: () => getWorkoutsQueryFn(4),
         queryKey: ["workouts", { limit: 4 }],
+        refetchOnMount: false,
     });
 
     return (

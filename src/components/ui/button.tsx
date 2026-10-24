@@ -1,10 +1,11 @@
 import type { ComponentRef, ReactNode } from "react";
-import { forwardRef } from "react";
+import { forwardRef, useRef, useState } from "react";
 import type { PressableProps } from "react-native";
 import { ActivityIndicator, Pressable, Text } from "react-native";
 
 import { cn } from "@/lib/utils";
 import { useAppThemeColor } from "@/theme/app-theme";
+import { useToast } from "./toast";
 
 const variants = {
   default: {
@@ -39,6 +40,8 @@ const Button = forwardRef<ComponentRef<typeof Pressable>, ButtonProps>(
       leftIcon,
       rightIcon,
       isLoading,
+      accessibilityState,
+      onPress,
       size = "default",
       variant = "default",
       ...props
@@ -46,6 +49,37 @@ const Button = forwardRef<ComponentRef<typeof Pressable>, ButtonProps>(
     ref,
   ) => {
     const primaryForeground = useAppThemeColor("primaryForeground");
+    const foreground = useAppThemeColor("foreground");
+    const secondaryForeground = useAppThemeColor("secondaryForeground");
+    const [pending, setPending] = useState(false);
+    const lock = useRef(false);
+    const { showToast } = useToast();
+    const loading = Boolean(isLoading || pending);
+    const blocked = Boolean(disabled || loading);
+    const handlePress: PressableProps["onPress"] = (event) => {
+      if (blocked || lock.current || !onPress) return;
+      lock.current = true;
+      const release = () => {
+        lock.current = false;
+        setPending(false);
+      };
+      const fail = () => {
+        release();
+        showToast("Something went wrong. Please try again.");
+      };
+      try {
+        const result: unknown = onPress(event);
+        if (
+          result &&
+          typeof (result as PromiseLike<unknown>).then === "function"
+        ) {
+          setPending(true);
+          void Promise.resolve(result).then(release, fail);
+        } else release();
+      } catch {
+        fail();
+      }
+    };
     return (
       <Pressable
         ref={ref}
@@ -54,16 +88,30 @@ const Button = forwardRef<ComponentRef<typeof Pressable>, ButtonProps>(
           "flex-row items-center justify-center gap-2 rounded-xl border px-5",
           size === "sm" ? "h-11" : "h-14",
           variants[variant].button,
-          disabled && "opacity-50",
+          blocked && "opacity-50",
           className,
         )}
-        disabled={Boolean(disabled)}
         {...props}
+        disabled={blocked}
+        accessibilityState={{
+          ...accessibilityState,
+          disabled: blocked,
+          busy: loading,
+        }}
+        onPress={handlePress}
       >
-        {!isLoading ? (
+        {!loading ? (
           leftIcon
         ) : (
-          <ActivityIndicator color={primaryForeground} />
+          <ActivityIndicator
+            color={
+              variant === "default"
+                ? primaryForeground
+                : variant === "secondary"
+                  ? secondaryForeground
+                  : foreground
+            }
+          />
         )}
         <Text
           className={cn(

@@ -1,37 +1,89 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/chefu-auth";
 import { getExerciseBookmarks, setExerciseBookmark } from "@/lib/api";
-import { useActionModal } from "@/components/ui/action-modal";
+import { useRef } from "react";
+import { useToast } from "@/components/ui/toast";
 
 export function useExerciseBookmarks() {
   const { userId } = useAuth();
-  const showModal = useActionModal();
+  const { toast, showToast, dismissToast } = useToast();
+  const pendingIds = useRef(new Set<string>());
   const client = useQueryClient();
   const queryKey = ["exercise-bookmarks", userId];
+  const mutationKey = ["update-exercise-bookmark", userId];
   const query = useQuery({
     queryKey,
     queryFn: getExerciseBookmarks,
     enabled: !!userId,
   });
   const mutation = useMutation({
+    mutationKey,
     mutationFn: ({ id, saved }: { id: string; saved: boolean }) =>
       setExerciseBookmark(id, saved),
-    onSuccess: async (_data, { id, saved }) => {
+    onMutate: async ({ id, saved }) => {
+      await client.cancelQueries({ queryKey });
+      const wasSaved =
+        client.getQueryData<string[]>(queryKey)?.includes(id) ?? false;
       client.setQueryData<string[]>(queryKey, (current = []) =>
         saved
           ? [...new Set([...current, id])]
           : current.filter((item) => item !== id),
       );
-      await client.invalidateQueries({ queryKey });
+      return { wasSaved };
     },
-    onError: (error) =>
-      showModal("Unable to update saved exercises", error.message),
+    onError: (_error, { id, saved }, context) => {
+      // Roll back this exercise only; preserve other in-flight bookmark changes.
+      if (context && client.getQueryData(queryKey) !== undefined) {
+        client.setQueryData<string[]>(queryKey, (current = []) =>
+          context.wasSaved
+            ? [...new Set([...current, id])]
+            : current.filter((item) => item !== id),
+        );
+      }
+      showToast(
+        saved
+          ? "Failed to save exercise. Please try again."
+          : "Failed to remove saved exercise. Please try again.",
+      );
+    },
+    onSettled: (_data, _error, { id }) => {
+      pendingIds.current.delete(id);
+      // Refetch after the last write so it cannot overwrite another optimistic tick.
+      if (
+        client.isMutating({ mutationKey }) === 1 &&
+        client.getQueryData(queryKey) !== undefined
+      )
+        void client.invalidateQueries({ queryKey });
+    },
   });
   return {
     ...query,
     ids: query.data ?? [],
     saving: mutation.isPending,
-    toggle: (id: string) =>
-      mutation.mutate({ id, saved: !query.data?.includes(id) }),
+    toast,
+    dismissToast,
+    toggle: (id: string) => {
+      if (
+        !userId ||
+        query.isPending ||
+        query.isError ||
+        pendingIds.current.has(id)
+      )
+        return;
+      const alreadySaving = client
+        .getMutationCache()
+        .findAll({ mutationKey })
+        .some(
+          (entry) =>
+            entry.state.status === "pending" &&
+            (entry.state.variables as { id?: string } | undefined)?.id === id,
+        );
+      if (alreadySaving) return;
+      pendingIds.current.add(id);
+      mutation.mutate({
+        id,
+        saved: !client.getQueryData<string[]>(queryKey)?.includes(id),
+      });
+    },
   };
 }

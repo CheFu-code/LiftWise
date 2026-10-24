@@ -4,6 +4,8 @@ import EmptyState from "@/components/ui/empty-state";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Skeleton from "@/components/ui/skeleton";
 import { useActionModal } from "@/components/ui/action-modal";
+import { useToast } from "@/components/ui/toast";
+import { optimisticWorkoutChange } from "@/lib/optimistic-workouts";
 import {
     deleteWorkoutMutationFn,
     changeWorkoutCoverMutationFn,
@@ -35,6 +37,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const Index = () => {
     const router = useRouter();
     const showModal = useActionModal();
+    const { showToast } = useToast();
     const queryClient = useQueryClient();
     const [busy, setBusy] = useState(false);
     const [dragging, setDragging] = useState(false);
@@ -76,6 +79,7 @@ const Index = () => {
         refetch,
     } = useQuery({
         queryKey: ["workouts", id],
+        refetchOnMount: false,
         queryFn: () => getWorkoutQueryFn(id),
         enabled: Boolean(id),
     });
@@ -95,27 +99,18 @@ const Index = () => {
         if (!workout || inFlight.current) return;
         inFlight.current = true;
         setBusy(true);
-        const queryKey = ["workouts", id];
+        let rollback:
+            Awaited<ReturnType<typeof optimisticWorkoutChange>> | undefined;
         try {
-            await queryClient.cancelQueries({ queryKey, exact: true });
-            const byId = new Map(
-                workout.exercises.map((exercise) => [exercise.id, exercise]),
-            );
-            queryClient.setQueryData(queryKey, {
-                ...workout,
-                exercises: exerciseIds.map((exerciseId) =>
-                    byId.get(exerciseId)!,
-                ),
+            rollback = await optimisticWorkoutChange(queryClient, id, {
+                exerciseIds,
             });
             await reorderWorkoutExercisesMutationFn(id, exerciseIds);
         } catch (cause) {
-            queryClient.setQueryData(queryKey, workout);
-            showModal(
-                "Unable to save exercise order",
-                cause instanceof Error ? cause.message : "Please try again.",
-            );
+            rollback?.();
+            showToast("Failed to save exercise order. Please try again.");
         } finally {
-            await queryClient.invalidateQueries({ queryKey, exact: true });
+            rollback?.settle();
             inFlight.current = false;
             setBusy(false);
         }
@@ -125,6 +120,12 @@ const Index = () => {
         if (!workout || inFlight.current) return;
         inFlight.current = true;
         setBusy(true);
+        let rollback:
+            Awaited<ReturnType<typeof optimisticWorkoutChange>> | undefined;
+        let deleted = false;
+        const detailQuery = queryClient
+            .getQueryCache()
+            .find({ queryKey: ["workouts", id], exact: true });
         try {
             if (action === "cover") {
                 if (Platform.OS !== "web") {
@@ -153,6 +154,13 @@ const Index = () => {
                     quality: 0.6,
                 });
                 if (result.canceled) return;
+                if (
+                    queryClient
+                        .getQueryCache()
+                        .find({ queryKey: ["workouts", id], exact: true }) !==
+                    detailQuery
+                )
+                    return;
                 const image = result.assets?.[0]?.base64;
                 if (!image)
                     throw new Error(
@@ -162,11 +170,18 @@ const Index = () => {
                     throw new Error(
                         "Please choose an image smaller than 2 MB.",
                     );
-                const updated = await changeWorkoutCoverMutationFn(id, image);
-                await queryClient.cancelQueries({
-                    queryKey: ["workouts", id],
-                    exact: true,
+                const asset = result.assets[0];
+                rollback = await optimisticWorkoutChange(queryClient, id, {
+                    image: asset.uri,
                 });
+                const updated = await changeWorkoutCoverMutationFn(id, image);
+                if (
+                    queryClient
+                        .getQueryCache()
+                        .find({ queryKey: ["workouts", id], exact: true }) !==
+                    detailQuery
+                )
+                    return;
                 queryClient.setQueryData<WorkoutDetail | null>(
                     ["workouts", id],
                     (current) =>
@@ -174,28 +189,35 @@ const Index = () => {
                             ? { ...current, image: updated.image }
                             : current,
                 );
-                await queryClient.invalidateQueries({ queryKey: ["workouts"] });
             } else {
-                await deleteWorkoutMutationFn(id);
-                await queryClient.cancelQueries({
-                    queryKey: ["workouts", id],
-                    exact: true,
+                rollback = await optimisticWorkoutChange(queryClient, id, {
+                    deleted: true,
                 });
                 router.replace("/workouts");
+                await deleteWorkoutMutationFn(id);
+                if (
+                    queryClient
+                        .getQueryCache()
+                        .find({ queryKey: ["workouts", id], exact: true }) !==
+                    detailQuery
+                )
+                    return;
+                deleted = true;
+            }
+        } catch (cause) {
+            rollback?.();
+            showToast(
+                action === "cover"
+                    ? "Failed to change cover image. Please try again."
+                    : "Failed to delete workout. Your workout has been restored.",
+            );
+        } finally {
+            rollback?.settle();
+            if (deleted)
                 queryClient.removeQueries({
                     queryKey: ["workouts", id],
                     exact: true,
                 });
-                await queryClient.invalidateQueries({ queryKey: ["workouts"] });
-            }
-        } catch (cause) {
-            showModal(
-                action === "cover"
-                    ? "Unable to change cover image"
-                    : "Unable to delete workout",
-                cause instanceof Error ? cause.message : "Please try again.",
-            );
-        } finally {
             inFlight.current = false;
             setBusy(false);
         }

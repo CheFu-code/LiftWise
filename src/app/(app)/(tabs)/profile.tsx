@@ -1,4 +1,5 @@
 import { useActionModal } from "@/components/ui/action-modal";
+import { useToast } from "@/components/ui/toast";
 import { Feather } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -14,6 +15,7 @@ import {
 } from "react";
 import {
     AppState,
+    ActivityIndicator,
     Image,
     Pressable,
     ScrollView,
@@ -35,6 +37,7 @@ const DELETE_ACCOUNT_URL = `${MY_ACCOUNT}/account?section=security`;
 
 export default function ProfilePage() {
     const showModal = useActionModal();
+    const { showToast } = useToast();
     const router = useRouter();
     const {
         session,
@@ -68,10 +71,17 @@ export default function ProfilePage() {
         }, [refreshAccount]),
     );
     const [savingWeightUnit, setSavingWeightUnit] = useState(false);
-    const weightUnit = session?.onboardingProfile?.weightUnit ?? "kg";
+    const weightUnitLock = useRef(false);
+    const signOutLock = useRef(false);
+    const [signingOut, setSigningOut] = useState(false);
+    const [pendingWeightUnit, setPendingWeightUnit] = useState<
+        "kg" | "lb" | null
+    >(null);
+    const weightUnit =
+        pendingWeightUnit ?? session?.onboardingProfile?.weightUnit ?? "kg";
 
     const saveWeightUnit = async (unit: "kg" | "lb") => {
-        if (savingWeightUnit || unit === weightUnit) return;
+        if (weightUnitLock.current || unit === weightUnit) return;
         const profile = onboardingValuesSchema.safeParse(
             session?.onboardingProfile,
         );
@@ -83,14 +93,17 @@ export default function ProfilePage() {
             return;
         }
         setSavingWeightUnit(true);
+        weightUnitLock.current = true;
+        setPendingWeightUnit(unit);
         try {
             await saveOnboardingProfile({ ...profile.data, weightUnit: unit });
         } catch (error) {
-            showModal(
-                "Unable to save weight unit",
-                error instanceof Error ? error.message : "Please try again.",
+            showToast(
+                "Failed to save weight unit. Your previous unit has been restored.",
             );
         } finally {
+            weightUnitLock.current = false;
+            setPendingWeightUnit(null);
             setSavingWeightUnit(false);
         }
     };
@@ -134,6 +147,9 @@ export default function ProfilePage() {
         .toUpperCase();
 
     const signOut = async () => {
+        if (signOutLock.current) return;
+        signOutLock.current = true;
+        setSigningOut(true);
         try {
             await signOutAccount();
         } catch (error) {
@@ -141,6 +157,9 @@ export default function ProfilePage() {
                 "Could not sign out",
                 error instanceof Error ? error.message : "Please try again.",
             );
+        } finally {
+            signOutLock.current = false;
+            setSigningOut(false);
         }
     };
 
@@ -204,10 +223,11 @@ export default function ProfilePage() {
                     <Row
                         icon="activity"
                         label="Weight Unit"
+                        loading={savingWeightUnit}
                         onPress={
                             savingWeightUnit ? undefined : chooseWeightUnit
                         }
-                        value={savingWeightUnit ? "Saving…" : weightUnit}
+                        value={weightUnit}
                     />
                     <Row
                         icon="bell"
@@ -258,7 +278,12 @@ export default function ProfilePage() {
                 </Section>
 
                 <Section title="Account">
-                    <Row icon="log-out" label="Sign Out" onPress={signOut} />
+                    <Row
+                        icon="log-out"
+                        label={signingOut ? "Signing out…" : "Sign Out"}
+                        loading={signingOut}
+                        onPress={signOut}
+                    />
                     <Row
                         danger
                         icon="trash-2"
@@ -273,6 +298,7 @@ export default function ProfilePage() {
 }
 
 type RowProps = {
+    loading?: boolean;
     danger?: boolean;
     icon: ComponentProps<typeof Feather>["name"];
     trailingIcon?: ComponentProps<typeof Feather>["name"];
@@ -296,6 +322,7 @@ function Section({ children, title }: { children: ReactNode; title: string }) {
 }
 
 function Row({
+    loading = false,
     danger,
     icon,
     label,
@@ -310,7 +337,11 @@ function Row({
     return (
         <Pressable
             className="min-h-16 flex-row items-center border-b border-border px-4 active:bg-muted"
-            disabled={!onPress}
+            disabled={!onPress || loading}
+            accessibilityState={{
+                disabled: !onPress || loading,
+                busy: loading,
+            }}
             onPress={onPress}
         >
             <Feather color={color} name={icon} size={19} />
@@ -325,7 +356,8 @@ function Row({
                 </Text>
             )}
             {right}
-            {onPress && !right && (
+            {loading && <ActivityIndicator color={muted} size="small" />}
+            {onPress && !right && !loading && (
                 <Feather color={muted} name={trailingIcon} size={19} />
             )}
         </Pressable>

@@ -1,5 +1,6 @@
 import { useActionModal } from "@/components/ui/action-modal";
-import { useEffect, useState } from "react";
+import { useToast } from "@/components/ui/toast";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
@@ -24,6 +25,7 @@ import { useAppThemeColor } from "@/theme/app-theme";
 
 export default function OnboardingStep() {
   const showModal = useActionModal();
+  const { showToast } = useToast();
   const { step: key = "" } = useLocalSearchParams<{ step: string }>();
   const { session, saveOnboardingProfile, signOut } = useAuth();
   const router = useRouter();
@@ -31,6 +33,7 @@ export default function OnboardingStep() {
   const [values, setValues] = useState<Partial<OnboardingValues>>({});
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const saveLock = useRef(false);
   const uid = session?.user.uid;
   const profile = session?.onboardingProfile;
   useEffect(() => {
@@ -74,6 +77,7 @@ export default function OnboardingStep() {
       });
   };
   const goNext = async () => {
+    if (saveLock.current) return;
     if (next) {
       router.push({
         pathname: "/onboarding/[step]",
@@ -87,16 +91,17 @@ export default function OnboardingStep() {
       return;
     }
     setSaving(true);
+    saveLock.current = true;
     try {
       await saveOnboardingProfile(parsed.data);
       await clearOnboardingDraft(uid).catch(() => undefined);
       router.replace("/");
     } catch (error) {
-      showModal(
-        "Unable to save preferences",
-        error instanceof Error ? error.message : "Please try again.",
+      showToast(
+        "Failed to save preferences. Your selections are ready to retry.",
       );
     } finally {
+      saveLock.current = false;
       setSaving(false);
     }
   };

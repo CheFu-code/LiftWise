@@ -11,11 +11,13 @@ import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import WeekCalendar from "@/components/week-calendar";
 import { useStreak } from "@/contexts/streak-context";
 import { getHomeStatsQueryFn, getWorkoutCalendarDatesQueryFn } from "@/lib/api";
+import { useAppThemeColor } from "@/theme/app-theme";
 
 const logo = require("../../../../assets/images/app-images/logo.png");
 const streakIcon = require("../../../../assets/images/app-images/streak-icon.png");
 
 export default function HomePage() {
+    const foreground = useAppThemeColor("foreground");
     const {
         currentStreak,
         isPending: streakPending,
@@ -63,7 +65,6 @@ export default function HomePage() {
                 contentContainerClassName="px-5 pb-5 pt-2"
                 showsVerticalScrollIndicator={false}
             >
-                {/* {Header Section} */}
                 <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center gap-0">
                         <View className="-ml-4 h-11 w-16 overflow-hidden">
@@ -71,6 +72,7 @@ export default function HomePage() {
                                 className="h-full w-full"
                                 resizeMode="cover"
                                 source={logo}
+                                tintColor={foreground}
                             />
                         </View>
                         <Text

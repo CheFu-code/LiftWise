@@ -15,6 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Button from "@/components/ui/button";
 import { useActionModal } from "@/components/ui/action-modal";
+import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/chefu-auth";
 import { onboardingValuesSchema } from "@/lib/validations/onboarding-validation";
 import {
@@ -28,6 +29,7 @@ export default function NotificationsPage() {
     const router = useRouter();
     const { session, saveOnboardingProfile } = useAuth();
     const showModal = useActionModal();
+    const { showToast } = useToast();
     const primary = useAppThemeColor("primary");
     const foreground = useAppThemeColor("foreground");
     const muted = useAppThemeColor("mutedForeground");
@@ -40,13 +42,18 @@ export default function NotificationsPage() {
     const [saving, setSaving] = useState(false);
     const [status, setStatus] = useState("Checking this device…");
     const lock = useRef(false);
+    const checking = useRef(false);
+    const [checkingDevice, setCheckingDevice] = useState(false);
     const checkDevice = useCallback(async () => {
+        if (checking.current) return;
         if (Platform.OS === "web") {
             setStatus(
                 "Workout reminders are available in the Android and iOS apps.",
             );
             return;
         }
+        checking.current = true;
+        setCheckingDevice(true);
         try {
             const permitted = await reminderPermission();
             setStatus(
@@ -60,6 +67,9 @@ export default function NotificationsPage() {
             setStatus(
                 "Unable to check reminders on this device. Please try again.",
             );
+        } finally {
+            checking.current = false;
+            setCheckingDevice(false);
         }
     }, []);
     useFocusEffect(
@@ -97,6 +107,13 @@ export default function NotificationsPage() {
         }
         lock.current = true;
         setSaving(true);
+        const previousStatus = status;
+        const previousReminder = parsed.data.reminder ?? {
+            enabled: false,
+            hour: 18,
+            minute: 0,
+        };
+        let changed = false;
         try {
             if (enabled && !(await reminderPermission(true))) {
                 showModal(
@@ -117,19 +134,34 @@ export default function NotificationsPage() {
                 hour: Number(hour),
                 minute: Number(minute),
             };
-            await saveOnboardingProfile({ ...parsed.data, reminder });
-            await syncWorkoutReminder(session?.user.uid, reminder);
-            await checkDevice();
-            showModal(
-                "Preferences saved",
+            changed = true;
+            setStatus(
                 enabled
-                    ? "Your daily workout reminder is set for your device's local time."
+                    ? `Daily reminder set for ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}.`
                     : "Your workout reminder is turned off.",
             );
+            // Verify device scheduling first; a device failure must not save unusable preferences.
+            await syncWorkoutReminder(session?.user.uid, reminder);
+            await saveOnboardingProfile({ ...parsed.data, reminder });
+            await checkDevice();
+            showToast("Reminder preferences saved.");
         } catch (cause) {
-            showModal(
-                "Unable to update reminders",
-                cause instanceof Error ? cause.message : "Please try again.",
+            if (changed) {
+                setEnabled(previousReminder.enabled);
+                setHour(String(previousReminder.hour).padStart(2, "0"));
+                setMinute(String(previousReminder.minute).padStart(2, "0"));
+                setStatus(previousStatus);
+                void syncWorkoutReminder(
+                    session?.user.uid,
+                    previousReminder,
+                ).catch(() => {
+                    setStatus(
+                        "Unable to restore this device's reminder. Please check device status.",
+                    );
+                });
+            }
+            showToast(
+                "Failed to save reminders. Your previous preferences have been restored.",
             );
         } finally {
             lock.current = false;
@@ -209,7 +241,7 @@ export default function NotificationsPage() {
                         isLoading={saving}
                         onPress={save}
                     >
-                        Save preferences
+                        {saving ? "Saving preferences…" : "Save preferences"}
                     </Button>
                 </View>
                 <Text
@@ -220,6 +252,8 @@ export default function NotificationsPage() {
                 </Text>
                 <Button
                     variant="outline"
+                    disabled={saving || checkingDevice || Platform.OS === "web"}
+                    isLoading={checkingDevice}
                     onPress={() => {
                         void checkDevice();
                     }}

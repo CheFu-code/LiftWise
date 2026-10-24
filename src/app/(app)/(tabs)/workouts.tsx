@@ -33,6 +33,7 @@ const Workouts = () => {
     } = useQuery({
         queryFn: () => getWorkoutsQueryFn(),
         queryKey: ["workouts"],
+        refetchOnMount: false,
     });
 
     return (

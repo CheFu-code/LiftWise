@@ -31,8 +31,68 @@ WebBrowser.maybeCompleteAuthSession();
 const ACCOUNT_URL =
   process.env.EXPO_PUBLIC_ACCOUNT_APP_URL || "https://myaccount.chefu.co.za";
 const ChefuAuthContext = createContext<ChefuAuthContextValue | null>(null);
+let profileWritePending = false;
+let profileRevision = 0;
+
+export async function saveProfile(
+  values: Parameters<ChefuAuthContextValue["saveOnboardingProfile"]>[0],
+) {
+  if (profileWritePending)
+    throw new Error("Your preferences are still saving. Please try again.");
+  profileWritePending = true;
+  profileRevision++;
+  let previous: ChefuAuthSession | null = null;
+  let optimistic = false;
+  try {
+    const token = await getToken();
+    if (!token) throw new Error("Please sign in again.");
+    previous = await readSession();
+    if (!previous) throw new Error("Please sign in again.");
+    // Keep first-time onboarding on its form until the server accepts it.
+    optimistic = onboardingValuesSchema.safeParse(
+      previous.onboardingProfile,
+    ).success;
+    if (optimistic)
+      await saveSession({
+        ...previous,
+        onboardingProfile: values,
+        user: { ...previous.user, gender: values.gender },
+      });
+    await postOnboardingProfile(token, values);
+    const latest = await readSession();
+    if (
+      latest &&
+      latest.user.uid === previous.user.uid &&
+      (!optimistic || latest.onboardingProfile === values)
+    )
+      await saveSession({
+        ...latest,
+        onboardingProfile: values,
+        user: { ...latest.user, gender: values.gender },
+      });
+  } catch (error) {
+    const latest = await readSession();
+    if (
+      optimistic &&
+      previous &&
+      latest &&
+      latest.user.uid === previous.user.uid &&
+      latest.onboardingProfile === values
+    )
+      await saveSession({
+        ...latest,
+        onboardingProfile: previous.onboardingProfile,
+        user: { ...latest.user, gender: previous.user.gender },
+      });
+    throw error;
+  } finally {
+    profileWritePending = false;
+    profileRevision++;
+  }
+}
 
 async function refreshOnboardingProfile() {
+  const revision = profileRevision;
   const token = await getToken();
   if (!token) throw new Error("Please sign in again.");
   const current = await readSession();
@@ -41,6 +101,8 @@ async function refreshOnboardingProfile() {
   if (
     current &&
     latest &&
+    !profileWritePending &&
+    revision === profileRevision &&
     latest.user.uid === current.user.uid &&
     latest.onboardingProfile === current.onboardingProfile
   )
@@ -80,20 +142,7 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
       session?.onboardingProfile,
     ).success,
     refreshOnboardingProfile,
-    saveOnboardingProfile: async (values) => {
-      const token = await getToken();
-      if (!token) throw new Error("Please sign in again.");
-      const current = await readSession();
-      await postOnboardingProfile(token, values);
-      const onboardingProfile = await fetchOnboardingProfile(token);
-      const latest = await readSession();
-      if (current && latest && latest.user.uid === current.user.uid)
-        await saveSession({
-          ...latest,
-          onboardingProfile,
-          user: { ...latest.user, gender: onboardingProfile.gender },
-        });
-    },
+    saveOnboardingProfile: saveProfile,
     userId: session?.user.uid,
     session,
     user: session?.user ?? null,

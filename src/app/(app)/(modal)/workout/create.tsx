@@ -1,5 +1,5 @@
 import { useActionModal } from "@/components/ui/action-modal";
-import LoadingModal from "@/components/loading-modal";
+import { useToast } from "@/components/ui/toast";
 import Button from "@/components/ui/button";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import { useWorkoutDraft } from "@/contexts/workout-draft-context";
@@ -9,8 +9,16 @@ import { Feather } from "@expo/vector-icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Image, Linking, Pressable, Text, TextInput, View } from "react-native";
+import { useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import {
   KeyboardAwareScrollView,
   KeyboardToolbar,
@@ -24,12 +32,16 @@ const formSchema = z.object({
 
 const CreateWorkout = () => {
   const showModal = useActionModal();
+  const { showToast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
   const muted = useAppThemeColor("mutedForeground");
   const primary = useAppThemeColor("primary");
 
   const [name, setName] = useState("");
+  const saveLock = useRef(false);
+  const pickerLock = useRef(false);
+  const [pickingImage, setPickingImage] = useState(false);
   const [description, setDescription] = useState("");
   const [coverImage, setCoverImage] = useState<{
     base64: string;
@@ -51,11 +63,15 @@ const CreateWorkout = () => {
         })),
         image: coverImage?.base64,
       }),
-    onError: (error) => showModal("Could not create workout", error.message),
+    onError: () =>
+      showToast("Failed to create workout. Your draft is ready to retry."),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      void queryClient.invalidateQueries({ queryKey: ["workouts"] });
       setSelectedExercises([]);
       router.push("/workouts");
+    },
+    onSettled: () => {
+      saveLock.current = false;
     },
   });
 
@@ -77,6 +93,7 @@ const CreateWorkout = () => {
   };
 
   const saveWorkout = () => {
+    if (saveLock.current || pickerLock.current) return;
     const result = formSchema.safeParse({
       exercises: selectedExercises,
       name,
@@ -85,37 +102,49 @@ const CreateWorkout = () => {
       showModal("Missing details", result.error.issues[0].message);
       return;
     }
+    saveLock.current = true;
     createMutation.mutate();
   };
 
   const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (pickerLock.current || saveLock.current) return;
+    pickerLock.current = true;
+    setPickingImage(true);
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (!permission.granted) {
-      showModal(
-        "Photo permission needed",
-        "Allow photo access in Settings to choose a workout cover",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: Linking.openSettings },
-        ],
-      );
-      return;
-    }
+      if (!permission.granted) {
+        showModal(
+          "Photo permission needed",
+          "Allow photo access in Settings to choose a workout cover",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Open Settings", onPress: Linking.openSettings },
+          ],
+        );
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      aspect: [16, 9],
-      base64: true,
-      mediaTypes: ["images"],
-      quality: 0.6,
-    });
-    const image = result.assets?.[0];
-    if (!result.canceled && image?.base64) {
-      setCoverImage({
-        base64: image.base64,
-        uri: image.uri,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [16, 9],
+        base64: true,
+        mediaTypes: ["images"],
+        quality: 0.6,
       });
+      const image = result.assets?.[0];
+      if (!result.canceled && image?.base64) {
+        setCoverImage({
+          base64: image.base64,
+          uri: image.uri,
+        });
+      }
+    } catch {
+      showToast("Failed to open photos. Please try again.");
+    } finally {
+      pickerLock.current = false;
+      setPickingImage(false);
     }
   };
 
@@ -133,7 +162,10 @@ const CreateWorkout = () => {
       >
         <View className="flex-grow px-5 pt-3 pb-8">
           <View className="flex-row items-center justify-between">
-            <Pressable onPress={() => router.back()}>
+            <Pressable
+              disabled={createMutation.isPending}
+              onPress={() => router.back()}
+            >
               <Text className="font-inter-medium text-[13px] text-destructive">
                 Cancel
               </Text>
@@ -143,15 +175,36 @@ const CreateWorkout = () => {
               Create Workout
             </Text>
 
-            <Pressable onPress={saveWorkout}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Save workout"
+              accessibilityState={{
+                busy: createMutation.isPending,
+                disabled: createMutation.isPending || pickingImage,
+              }}
+              disabled={createMutation.isPending || pickingImage}
+              onPress={saveWorkout}
+              className="min-h-11 flex-row items-center gap-2"
+            >
+              {createMutation.isPending && (
+                <ActivityIndicator size="small" color={primary} />
+              )}
               <Text className="font-inter-medium text-[13px] text-primary">
-                Save
+                {createMutation.isPending ? "Saving…" : "Save"}
               </Text>
             </Pressable>
           </View>
 
-          <View className="mt-4 gap-5">
+          <View
+            className="mt-4 gap-5"
+            pointerEvents={createMutation.isPending ? "none" : "auto"}
+          >
             <Pressable
+              disabled={pickingImage || createMutation.isPending}
+              accessibilityState={{
+                busy: pickingImage,
+                disabled: pickingImage || createMutation.isPending,
+              }}
               onPress={pickImage}
               className="h-44 items-center justify-center overflow-hidden rounded-xl border border-input-border bg-muted"
             >
@@ -175,6 +228,11 @@ const CreateWorkout = () => {
                   </Text>
                 </View>
               )}
+              {pickingImage && (
+                <View className="absolute inset-0 items-center justify-center bg-black/40">
+                  <ActivityIndicator color="white" />
+                </View>
+              )}
             </Pressable>
 
             <View className="gap-2">
@@ -182,6 +240,7 @@ const CreateWorkout = () => {
                 Workout Name
               </Text>
               <TextInput
+                editable={!createMutation.isPending}
                 className="h-14 rounded-xl border border-input-border bg-input px-4 font-inter text-[14px] text-foreground"
                 onChangeText={setName}
                 maxLength={80}
@@ -197,6 +256,7 @@ const CreateWorkout = () => {
                 Description (Optional)
               </Text>
               <TextInput
+                editable={!createMutation.isPending}
                 className="h-24 rounded-xl border border-input-border bg-input px-4 py-3 font-inter text-[14px] text-foreground"
                 multiline
                 value={description}
@@ -301,11 +361,6 @@ const CreateWorkout = () => {
         </View>
       </KeyboardAwareScrollView>
       <KeyboardToolbar />
-
-      <LoadingModal
-        message="Saving workout..."
-        visible={createMutation.isPending}
-      />
     </SafeAreaScreen>
   );
 };
