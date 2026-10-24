@@ -1,0 +1,156 @@
+
+name: LiftWise Android Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Signed APK and AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      CI: "1"
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate native Android project
+        run: |
+          if [ ! -f android/gradlew ]; then
+            npx expo prebuild \
+              --platform android \
+              --non-interactive
+          fi
+
+      - name: Restore release keystore
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" \
+            | base64 --decode \
+            > "$RUNNER_TEMP/liftwise-release.jks"
+
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/liftwise-release.jks" >> "$GITHUB_ENV"
+
+      - name: Configure release signing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("android/app/build.gradle")
+          source = path.read_text()
+
+          if "signingConfigs {" not in source:
+              raise SystemExit("Android signingConfigs block not found")
+
+          signing = """
+          signingConfigs {
+              release {
+                  storeFile file(System.getenv("ANDROID_KEYSTORE_FILE"))
+                  storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                  keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                  keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+              }
+          """
+
+          source = source.replace(
+              "signingConfigs {",
+              signing,
+              1
+          )
+
+          head, separator, tail = source.partition("buildTypes {")
+          if not separator:
+              raise SystemExit("Android buildTypes block not found")
+
+          match = re.search(r'\brelease\s*\{', tail)
+          if not match:
+              raise SystemExit("Release build type not found")
+
+          before = tail[:match.end()]
+          after = tail[match.end():]
+
+          if "signingConfig signingConfigs.debug" in after:
+              after = after.replace(
+                  "signingConfig signingConfigs.debug",
+                  "signingConfig signingConfigs.release",
+                  1
+              )
+          elif "signingConfig signingConfigs.release" not in after:
+              after = "\n signingConfig signingConfigs.release\n" + after
+
+          path.write_text(
+              head + separator + before + after
+          )
+          PY
+
+      - name: Make Gradle executable
+        run: chmod +x android/gradlew
+
+      - name: Build signed APK and AAB
+        working-directory: android
+        run: |
+          ./gradlew \
+            :app:assembleRelease \
+            :app:bundleRelease \
+            --no-daemon \
+            --stacktrace
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p release
+
+          cp android/app/build/outputs/apk/release/*.apk \
+            release/LiftWise-release.apk
+
+          cp android/app/build/outputs/bundle/release/*.aab \
+            release/LiftWise-release.aab
+
+          ls -lh release/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiftWise-Release-APK
+          path: release/LiftWise-release.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiftWise-Release-AAB
+          path: release/LiftWise-release.aab
+          retention-days: 30
+          if-no-files-found: error
