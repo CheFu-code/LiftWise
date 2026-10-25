@@ -1,3 +1,4 @@
+import { workoutHaptic } from "@/lib/workout-haptics";
 import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { syncRestAlert } from "@/lib/workout-reminders";
@@ -31,8 +32,15 @@ export function useWorkoutTimer(options?: { userId?: string; restAlerts?: boolea
         setElapsed(
           accumulatedRef.current + (Date.now() - lastResumeAt.current) / 1000,
         );
-      if (restEndsAt.current !== null)
-        setRest(Math.max(0, (restEndsAt.current - Date.now()) / 1000));
+      if (restEndsAt.current !== null) {
+        const remaining = Math.max(0, (restEndsAt.current - Date.now()) / 1000);
+        setRest(remaining);
+        if (remaining === 0) {
+          const overdue = Date.now() - restEndsAt.current;
+          restEndsAt.current = null;
+          if (AppState.currentState === "active" && overdue <= 2000) workoutHaptic("rest");
+        }
+      }
     };
     let timer: ReturnType<typeof setInterval> | undefined;
     const update = () => {
@@ -65,10 +73,11 @@ export function useWorkoutTimer(options?: { userId?: string; restAlerts?: boolea
   };
 
   const startRest = (seconds: number) => {
-    restEndsAt.current = Date.now() + seconds * 1000;
-    setRest(seconds);
+    const duration = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+    restEndsAt.current = duration > 0 ? Date.now() + duration * 1000 : null;
+    setRest(duration);
     const pref = preferences.current;
-    if (pref?.restAlerts && seconds > 0) void syncRestAlert(pref.userId, alertKey.current, restEndsAt.current, pref.sound !== false).catch(() => showToast("Unable to schedule the rest alert. The timer still works in the app."));
+    if (pref?.restAlerts && duration > 0) void syncRestAlert(pref.userId, alertKey.current, restEndsAt.current ?? undefined, pref.sound !== false).catch(() => showToast("Unable to schedule the rest alert. The timer still works in the app."));
     else void syncRestAlert(undefined, alertKey.current).catch(() => undefined);
   };
 

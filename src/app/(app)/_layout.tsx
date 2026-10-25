@@ -19,6 +19,7 @@ export default function Applayout() {
           }}
         />
         <Stack.Screen name="(modal)/history/[id]" />
+        <Stack.Screen name="plate-calculator" options={{ presentation: "modal" }} />
       </Stack>
     </StreakProvider>
   );

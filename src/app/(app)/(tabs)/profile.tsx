@@ -258,6 +258,10 @@ export default function ProfilePage() {
                     />
                 </Section>
 
+                <Section title="Workout tools">
+                    <Row icon="sliders" label="Workout settings" onPress={() => router.push("/workout-settings")} />
+                    <Row icon="grid" label="Plate calculator" onPress={() => router.push("/plate-calculator")} />
+                </Section>
                 <Section title="Support & Legal">
                     <Row
                         icon="help-circle"

@@ -9,3 +9,8 @@
 - Improved reminder scheduling and cancellation.
 - Split notification settings into smaller components.
 - Disabled Sentry in development builds.
+
+- Keep the screen awake during active workouts.
+- Haptic feedback for sets, rest timers, and workout completion.
+- Device-only workout settings.
+- Plate calculator with kg/lb and selectable plate sizes.

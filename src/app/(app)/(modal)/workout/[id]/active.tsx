@@ -1,3 +1,6 @@
+import { useActiveWorkoutAwake } from "@/hooks/use-active-workout-awake";
+import { useLocalWorkoutPreferences } from "@/lib/local-workout-preferences";
+import { workoutHaptic } from "@/lib/workout-haptics";
 import { useAuth } from "@/lib/chefu-auth";
 import { fromKilograms, weightInput, type WeightUnit } from "@/lib/weight";
 import { useActionModal } from "@/components/ui/action-modal";
@@ -38,6 +41,7 @@ const ActiveSessionPage = () => {
     const showModal = useActionModal();
     const { showToast } = useToast();
     const { session } = useAuth();
+    const devicePreferences = useLocalWorkoutPreferences();
     const [weightUnit, setWeightUnit] = useState<WeightUnit>(
         () => session?.onboardingProfile?.weightUnit ?? "kg",
     );
@@ -117,6 +121,7 @@ const ActiveSessionPage = () => {
         enabled: Boolean(id),
     });
     const workout = restoredWorkout ?? remoteWorkout;
+    useActiveWorkoutAwake(Boolean(workout && draftReady && !timer.isPaused && devicePreferences.ready && devicePreferences.keepAwake));
     useEffect(() => {
         if (draftReady && remoteWorkout && !restoredWorkout) setRestoredWorkout(remoteWorkout);
     }, [draftReady, remoteWorkout, restoredWorkout]);
@@ -164,6 +169,7 @@ const ActiveSessionPage = () => {
                 sets,
             });
 
+            workoutHaptic("finish");
             showToast("Workout saved on this device. Syncing when connected.");
             allowLeave.current = true;
             return true;
@@ -294,7 +300,7 @@ const ActiveSessionPage = () => {
         setCompleted((prev) =>
             isDone ? prev.filter((item) => item !== key) : [...prev, key],
         );
-        if (!isDone) timer.startRest(exercise.rest ?? 0);
+        if (!isDone) { workoutHaptic("set"); timer.startRest(exercise.rest ?? 0); }
     };
 
     if (draftError) return <EmptyState message="Unable to restore workout progress. Restart the app to retry safely." />;
@@ -364,6 +370,7 @@ function ActiveSession({
 }: ActiveSessionProps) {
     const muted = useAppThemeColor("mutedForeground");
     const primary = useAppThemeColor("primary");
+    const router = useRouter();
     const [expanded, setExpanded] = useState(workout.exercises[0]?.name ?? "");
 
     const completedExercises = workout.exercises.filter((exercise) =>
@@ -400,6 +407,10 @@ function ActiveSession({
                     </Pressable>
                 </View>
 
+                <Pressable accessibilityRole="button" disabled={isSaving} onPress={() => router.push("/plate-calculator")} className="mt-4 min-h-11 flex-row items-center gap-2 self-start rounded-xl bg-muted px-3">
+                    <Feather name="grid" size={16} color={primary} />
+                    <Text className="font-inter-medium text-[13px] text-primary">Plate calculator</Text>
+                </Pressable>
                 <View className="my-7 flex-row items-center justify-between">
                     <View>
                         <Text className="font-inter-bold text-[38px] tracking-[-1px] text-foreground">

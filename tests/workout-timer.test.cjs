@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const ts = require('typescript');
 function timerHarness() {
   let now = 10000, cursor = 0, sequence = 0;
-  const slots = [], effects = [], intervals = new Map(), listeners = new Set(), alerts = [];
+  const slots = [], effects = [], intervals = new Map(), listeners = new Set(), alerts = [], feedback = [];
   const app = { currentState: 'active', addEventListener: (_name, fn) => { listeners.add(fn); return { remove: () => listeners.delete(fn) }; } };
   class Clock extends Date { static now() { return now; } }
   const module = { exports: {} };
@@ -17,11 +17,12 @@ function timerHarness() {
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/hooks/use-workout-timer.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, {
     module, exports: module.exports, Date: Clock,
     setInterval: fn => { const id = ++sequence; intervals.set(id, fn); return id; }, clearInterval: id => intervals.delete(id),
-    require: name => ({ react, 'react-native': { AppState: app }, '@/lib/workout-reminders': { syncRestAlert: async (...args) => { alerts.push(args); } }, '@/lib/toast-store': { showToast() {} } })[name],
+    require: name => ({ react, 'react-native': { AppState: app }, '@/lib/workout-reminders': { syncRestAlert: async (...args) => { alerts.push(args); } }, '@/lib/toast-store': { showToast() {} }, '@/lib/workout-haptics': { workoutHaptic: kind => feedback.push(kind) } })[name],
   });
   let options = { userId: 'alice', restAlerts: true, sound: false };
   return {
-    alerts, intervals,
+    alerts, intervals, feedback,
+    tick: () => intervals.forEach(fn => fn()),
     render: next => { if (next) options = next; cursor = 0; const result = module.exports.useWorkoutTimer(options); while (effects.length) effects.shift()(); return result; },
     background: () => { app.currentState = 'background'; listeners.forEach(fn => fn('background')); },
     foreground: () => { app.currentState = 'active'; listeners.forEach(fn => fn('active')); },
@@ -59,5 +60,17 @@ test('rest alerts stay off unless enabled, and restoring elapsed time preserves 
   assert.equal(timer.startedAt, 1000);
   assert.equal(timer.elapsed, 10);
   assert.equal(timer.isPaused, true);
+  hook.stop();
+});
+
+
+test('rest completion vibrates once, while zero-length and stale background rests do not', () => {
+  const hook = timerHarness();
+  hook.render().startRest(0); hook.tick();
+  assert.equal(hook.feedback.length,0);
+  hook.render().startRest(1); hook.advance(1000); hook.tick(); hook.tick();
+  assert.deepEqual(hook.feedback,['rest']);
+  hook.render().startRest(1); hook.background(); hook.advance(60_000); hook.foreground();
+  assert.deepEqual(hook.feedback,['rest']);
   hook.stop();
 });
