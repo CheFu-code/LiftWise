@@ -1,3 +1,4 @@
+
 name: Android Development Client
 
 on:
@@ -12,12 +13,14 @@ concurrency:
 
 jobs:
   build:
-    name: Build development APK
+    name: Build Development APK
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
+
     defaults:
       run:
         shell: bash
+
     env:
       CI: "1"
       EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL || 'https://api.chefu.co.za' }}
@@ -25,44 +28,46 @@ jobs:
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
     steps:
-      - name: Check out repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
 
-      - name: Set up Java and Gradle cache
-        uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
-          cache-dependency-path: |
-            package-lock.json
-            app.json
 
       - name: Install dependencies
         run: npm ci
 
-      # expo-dev-client is already installed; a debug build includes its launcher.
-      # CI=1 makes prebuild non-interactive. Native projects are generated on the runner.
-      - name: Generate native Android project
-        run: npx expo prebuild --platform android --no-install
+      - name: Generate Android project
+        run: |
+          npx expo prebuild \
+            --platform android \
+            --non-interactive \
+            --no-install
 
-      - name: Build Android development client
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build Android Development Client
         working-directory: android
         run: |
           chmod +x gradlew
+
           ./gradlew :app:assembleDebug \
             --no-daemon \
             --max-workers=2 \
             --stacktrace \
             -PreactNativeArchitectures=arm64-v8a,x86_64
 
-      - name: Upload development APK
+      - name: Upload Development APK
         id: apk
         uses: actions/upload-artifact@v4
         with:
@@ -77,11 +82,19 @@ jobs:
           APK_ARTIFACT_URL: ${{ steps.apk.outputs.artifact-url }}
         run: |
           {
-            echo '### LiftWise Android development client'
-            printf '\n[Download the APK artifact](%s)\n\n' "$APK_ARTIFACT_URL"
-            echo '1. Extract the artifact ZIP and install the APK on your Android device or emulator.'
-            echo '2. In the LiftWise project, run `npx expo start --dev-client`.'
-            echo '3. Open the installed app and connect to your development server.'
-            echo ''
-            echo 'This debug APK uses the generated debug keystore and requires Metro to run the app.'
+            echo "### LiftWise Android Development Client"
+            echo ""
+            echo "[Download APK artifact]($APK_ARTIFACT_URL)"
+            echo ""
+            echo "1. Extract the downloaded ZIP."
+            echo "2. Install the APK on your Android device."
+            echo "3. Start the Metro server:"
+            echo ""
+            echo '   npx expo start --dev-client'
+            echo ""
+            echo "4. Open LiftWise on your Android device."
+            echo "5. Connect to your Metro development server."
+            echo ""
+            echo "This is a debug development client."
+            echo "Metro is required to load JavaScript."
           } >> "$GITHUB_STEP_SUMMARY"
