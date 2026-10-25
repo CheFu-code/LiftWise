@@ -80,7 +80,7 @@ export default function AiCoachModal({
                                 Step-by-step guidance
                             </Text>
 
-                            {isPending ? (
+                            {isPending && instructions.length === 0 ? (
                                 <View className="mt-4 gap-3">
                                     <Skeleton className="h-10 w-full" />
                                     <Skeleton className="h-10 w-full" />

@@ -6,6 +6,8 @@ const vm = require("node:vm");
 const ts = require("typescript");
 const { QueryClient } = require("@tanstack/react-query");
 
+const pagesModule = { exports: {} };
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, "../src/lib/optimistic-workout-pages.ts"), "utf8"), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText, {module:pagesModule,exports:pagesModule.exports});
 const moduleFile = { exports: {} };
 vm.runInNewContext(
   ts.transpileModule(
@@ -20,7 +22,7 @@ vm.runInNewContext(
       },
     },
   ).outputText,
-  { module: moduleFile, exports: moduleFile.exports },
+  { module: moduleFile, exports: moduleFile.exports, require: () => pagesModule.exports },
 );
 const { optimisticWorkoutChange } = moduleFile.exports;
 
@@ -160,4 +162,19 @@ test("server confirmation wins over an old refetch result during an optimistic e
   deletion.confirmDeletion();
   deletion.settle();
   assert.deepEqual(Array.from(list(client), (workout) => workout.id), ["b"]);
+});
+
+
+test("paginated lists update covers, preserve another edit during rollback, and restore deleted rows", async () => {
+  const client = setup();
+  client.setQueryData(["workouts", "pages"], {pages:[{items:[{id:"a",image:"old"}],nextCursor:"next"},{items:[{id:"b",image:"other"}],nextCursor:null}],pageParams:[undefined,"next"]});
+  const cover = await optimisticWorkoutChange(client,"a",{image:"local"});
+  assert.equal(client.getQueryData(["workouts","pages"]).pages[0].items[0].image,"local");
+  cover.confirmImage("server"); cover.settle();
+  const deletion = await optimisticWorkoutChange(client,"a",{deleted:true});
+  assert.equal(client.getQueryData(["workouts","pages"]).pages[0].items.length,0);
+  deletion(); deletion.settle();
+  assert.equal(client.getQueryData(["workouts","pages"]).pages[0].items[0].image,"server");
+  assert.equal(client.getQueryData(["workouts","pages"]).pages[1].items[0].image,"other");
+  client.clear();
 });

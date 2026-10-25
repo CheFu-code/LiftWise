@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 
 export function useWorkoutTimer() {
   const [startedAt, setStartedAt] = useState(() => Date.now());
@@ -14,16 +15,23 @@ export function useWorkoutTimer() {
   useEffect(() => {
     if (!isPaused) lastResumeAt.current = Date.now();
 
-    const timer = setInterval(() => {
+    const tick = () => {
       if (!isPaused)
         setElapsed(
           accumulatedRef.current + (Date.now() - lastResumeAt.current) / 1000,
         );
       if (restEndsAt.current !== null)
         setRest(Math.max(0, (restEndsAt.current - Date.now()) / 1000));
-    }, 500);
-
-    return () => clearInterval(timer);
+    };
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const update = () => {
+      clearInterval(timer);
+      tick();
+      if (AppState.currentState === "active") timer = setInterval(tick, 1000);
+    };
+    update();
+    const subscription = AppState.addEventListener("change", update);
+    return () => { clearInterval(timer); subscription.remove(); };
   }, [isPaused]);
 
   const pause = () => {

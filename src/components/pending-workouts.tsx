@@ -10,7 +10,7 @@ import Button from "@/components/ui/button";
 
 export default function PendingWorkouts() {
     const { userId } = useAuth();
-    const [status, setStatus] = useState({ count: 0, blocked: false });
+    const [status, setStatus] = useState<{ uid?: string; count: number; blocked: boolean }>({ count: 0, blocked: false });
     useEffect(() => {
         let active = true;
         const update = async () => {
@@ -19,6 +19,7 @@ export default function PendingWorkouts() {
                 const { pending } = await readWorkoutJournal(userId);
                 if (active)
                     setStatus({
+                        uid: userId,
                         count: Object.keys(pending).length,
                         blocked: Object.values(pending).some(
                             (entry) => entry.blocked,
@@ -35,7 +36,7 @@ export default function PendingWorkouts() {
             stop();
         };
     }, [userId]);
-    if (!status.count) return null;
+    if (status.uid !== userId || !status.count) return null;
     return (
         <View className="mb-4 gap-2 rounded-xl border border-border bg-card p-4">
             <Text

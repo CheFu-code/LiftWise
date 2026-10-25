@@ -1,5 +1,6 @@
 import { addDays, startOfDay } from "date-fns";
 import { API_URL, authenticatedFetch } from "./auth-client";
+import * as Crypto from "expo-crypto";
 
 export type WorkoutListItem = {
     exerciseCount: number;
@@ -241,14 +242,16 @@ export async function setExerciseBookmark(id: string, saved: boolean) {
         throw new Error(error?.message || "Unable to save exercise.");
 }
 
-export async function getExercisesQueryFn(search?: string) {
+export async function getExercisesQueryFn(search?: string, cached?: ExerciseItem[]) {
     const query = search ? `?search=${encodeURIComponent(search)}` : "";
     const { data, error } = await authenticatedFetch<ExerciseItem[]>(
         `${API_URL}/liftwise/exercises${query}`,
         {
             method: "GET",
+      headers: cached ? { "If-None-Match": `"${await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, JSON.stringify(cached))}"` } : undefined,
         },
     );
+  if (error?.status === 304 && cached) return cached;
     if (error) throw new Error(error.message);
 
     return data;

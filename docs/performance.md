@@ -1,5 +1,7 @@
 # LiftWise data and loading behavior
 
+The 25 October follow-up supersedes the older complete-workout-list and yearly-streak details below: see [optimization audit](optimization-audit-2026-10.md) for current pagination, durable completion, monthly summaries, deployment order and validation limits.
+
 ## Client
 
 - Mutable queries are fresh for one minute. The exercise catalogue, exercise details and AI instructions are fresh for 24 hours; streak data for five minutes. Pull-to-refresh and explicit retries bypass freshness. Returning to the app refreshes active stale queries, except while writes are pending. Network state pauses reads while offline and resumes them on reconnection. Writes fail through their normal error/rollback path instead of being queued for another account/session.

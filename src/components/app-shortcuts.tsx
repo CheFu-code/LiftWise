@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import * as QuickActions from "expo-quick-actions";
 import { useQuickActionCallback } from "expo-quick-actions/hooks";
-import { useRootNavigationState, useRouter } from "expo-router";
+import { usePathname, useRootNavigationState, useRouter } from "expo-router";
 import { useAuth } from "@/lib/chefu-auth";
 import { appShortcuts, shortcutDestination } from "@/lib/app-shortcuts";
 
 export default function AppShortcuts() {
     const router = useRouter();
+    const pathname = usePathname();
     const navigation = useRootNavigationState();
     const { isLoaded, isSignedIn, isOnboardingComplete } = useAuth();
     const [pending, setPending] =
@@ -44,7 +45,9 @@ export default function AppShortcuts() {
             !navigation?.key ||
             !isLoaded ||
             !isSignedIn ||
-            !isOnboardingComplete
+            !isOnboardingComplete ||
+            ["/welcome", "/sign-in", "/sign-up", "/sso-callback"].includes(pathname) ||
+            pathname.startsWith("/onboarding")
         )
             return;
         setPending(null);
@@ -56,6 +59,7 @@ export default function AppShortcuts() {
         isSignedIn,
         isOnboardingComplete,
         router,
+        pathname,
     ]);
     return null;
 }

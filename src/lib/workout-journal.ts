@@ -1,7 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { SaveSessionInput } from "./api";
+import type { SaveSessionInput, WorkoutDetail } from "./api";
 
 export type WorkoutDraft = {
+  workout?: WorkoutDetail;
   requestId: string;
   workoutId: string;
   startedAt: number;
@@ -80,9 +81,9 @@ export const postponeCompletion = (uid: string, requestId: string, blocked: bool
   const entry = journal.pending[requestId];
   if (!entry) return;
   entry.attempts++;
-  entry.blocked = blocked;
+  entry.blocked = blocked || entry.attempts >= 10;
   entry.nextAttempt = Date.now() + Math.min(300_000, 2000 * 2 ** Math.min(entry.attempts, 8)) * (0.75 + Math.random() * 0.5);
 });
 export const retryBlockedCompletions = (uid: string) => change(uid, (journal) => {
-  Object.values(journal.pending).forEach((entry) => { entry.blocked = false; entry.nextAttempt = 0; });
+  Object.values(journal.pending).forEach((entry) => { entry.blocked = false; entry.nextAttempt = 0; entry.attempts = 0; });
 });

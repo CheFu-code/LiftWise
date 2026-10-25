@@ -20,7 +20,7 @@ function setup() {
   }}});
   return {journal,disk,setFail:(value)=>fail=value};
 }
-const draft = {requestId:'completion-1',workoutId:'workout-1',startedAt:1000,elapsed:600,paused:true,savedAt:601000,weightUnit:'lb',completed:['curl-1'],values:{'curl-1':{reps:'12',weight:'80'}}};
+const draft = {workout:{id:'workout-1',name:'Recovered workout',description:null,image:null,muscles:'arms',exercises:[]},requestId:'completion-1',workoutId:'workout-1',startedAt:1000,elapsed:600,paused:true,savedAt:601000,weightUnit:'lb',completed:['curl-1'],values:{'curl-1':{reps:'12',weight:'80'}}};
 const completion = {requestId:'completion-1',workoutId:'workout-1',startedAt:'2026-10-24T10:00:00.000Z',completedAt:'2026-10-24T10:10:00.000Z',durationSeconds:600,sets:[]};
 test('drafts recover values and remain isolated from a different account',async()=>{
   const {journal}=setup();
@@ -72,4 +72,13 @@ test('shortcut destinations resolve only known IDs and include only existing scr
   assert.equal(shortcutDestination('//malicious.example'),null);
   const config=JSON.parse(fs.readFileSync('app.json','utf8'));
   assert.equal(config.expo.plugins.filter(value=>value==='expo-quick-actions').length,1);
+});
+
+test('automatic retries stop after ten failures without deleting a completion',async()=>{
+  const {journal}=setup();
+  await journal.enqueueWorkoutCompletion('alice',completion);
+  for(let i=0;i<10;i++) await journal.postponeCompletion('alice',completion.requestId,false);
+  const entry=(await journal.readWorkoutJournal('alice')).pending[completion.requestId];
+  assert.equal(entry.attempts,10);
+  assert.equal(entry.blocked,true);
 });

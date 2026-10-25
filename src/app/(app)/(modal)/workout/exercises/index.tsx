@@ -7,12 +7,13 @@ import { useWorkoutDraft } from "@/contexts/workout-draft-context";
 import { filterWorkouts } from "@/lib/workout-search";
 import { ExerciseItem, getExercisesQueryFn } from "@/lib/api";
 import { useAppThemeColor } from "@/theme/app-theme";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import ExercisesUI from "./ui/ExercisesUI";
 
 const Index = () => {
+    const client = useQueryClient();
     const { session } = useAuth();
     const defaults = workoutDefaults(session?.onboardingProfile);
     const bookmarks = useExerciseBookmarks();
@@ -32,7 +33,7 @@ const Index = () => {
         refetch,
     } = useQuery({
         queryKey: ["exercises"],
-        queryFn: () => getExercisesQueryFn(),
+        queryFn: () => getExercisesQueryFn(undefined, client.getQueryData<ExerciseItem[]>(["exercises"])),
         select: (catalogue) => filterWorkouts(catalogue, query),
     });
     const exercises = catalogue ?? [];
