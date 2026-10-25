@@ -9,6 +9,14 @@ export type WorkoutListItem = {
     name: string;
     totalSets: number;
 };
+export type WorkoutPage = { items: WorkoutListItem[]; nextCursor: string | null };
+export async function getWorkoutPage(cursor?: string) {
+  const params = new URLSearchParams({ limit: "20" });
+  if (cursor) params.set("cursor", cursor);
+  const { data, error } = await authenticatedFetch<WorkoutPage>(`${API_URL}/liftwise/workouts/page?${params}`);
+  if (error || !data) throw new Error(error?.message || "Unable to load workouts.");
+  return data;
+}
 
 export type CreateWorkoutInput = {
     name: string;

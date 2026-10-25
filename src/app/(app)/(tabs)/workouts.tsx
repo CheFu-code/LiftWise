@@ -1,13 +1,14 @@
+import Button from "@/components/ui/button";
 import EmptyState from "@/components/ui/empty-state";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import Skeleton from "@/components/ui/skeleton";
-import { getWorkoutsQueryFn } from "@/lib/api";
+import { getWorkoutPage } from "@/lib/api";
 import { filterWorkouts } from "@/lib/workout-search";
 import { useAppThemeColor } from "@/theme/app-theme";
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FlatList, RefreshControl, Text, TextInput, View } from "react-native";
 import Image from "@/components/ui/cached-image";
 import { TouchableOpacity } from "@/components/ui/guarded-pressable";
@@ -19,20 +20,36 @@ const Workouts = () => {
     const [query, setQuery] = useState("");
 
     const {
-        data: workouts = [],
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
         isError,
         isPending,
         isRefetching,
         refetch,
-    } = useQuery({
-        queryFn: () => getWorkoutsQueryFn(),
-        queryKey: ["workouts"],
+    } = useInfiniteQuery({
+        queryFn: ({ pageParam }) => getWorkoutPage(pageParam),
+        queryKey: ["workouts", "pages"],
+        initialPageParam: undefined as string | undefined,
+        getNextPageParam: (page) => page.nextCursor ?? undefined,
     });
+    const workouts = [...new Map((data?.pages.flatMap((page) => page.items) ?? []).map((item) => [item.id, item])).values()];
+    // Preserve full-list substring search. Only an explicit search downloads
+    // additional pages; ordinary navigation fetches a single bounded page.
+    useEffect(() => {
+        if (!query.trim() || !hasNextPage || isFetchingNextPage || isError) return;
+        const timer = setTimeout(() => void fetchNextPage(), 300);
+        return () => clearTimeout(timer);
+    }, [query, hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
 
     return (
         <SafeAreaScreen edges={["top", "bottom"]}>
             <FlatList
                 data={filterWorkouts(workouts, query)}
+                onEndReached={() => { if (hasNextPage && !isFetchingNextPage && !isError) void fetchNextPage(); }}
+                onEndReachedThreshold={0.4}
+                ListFooterComponent={hasNextPage ? <Button size="sm" isLoading={isFetchingNextPage} onPress={() => fetchNextPage().then(() => undefined)}>{isError ? "Retry loading workouts" : "Load more"}</Button> : null}
                 contentContainerClassName="px-5 pb-24"
                 ItemSeparatorComponent={() => <View className="h-3" />}
                 keyExtractor={(item) => item.id}
@@ -146,7 +163,7 @@ const Workouts = () => {
                         tintColor={primary}
                         colors={[primary]}
                         refreshing={isRefetching}
-                        onRefresh={() => refetch}
+                        onRefresh={() => void refetch()}
                     />
                 }
 

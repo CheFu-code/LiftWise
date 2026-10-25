@@ -1,4 +1,5 @@
 export function imageUrl(uri: string, width = 960) {
+  width = Math.max(160, Math.min(1920, Math.round(Number.isFinite(width) ? width : 960)));
   try {
     const url = new URL(uri);
     if (

@@ -11,7 +11,8 @@ export async function authenticatedFetch<T = unknown>(
   expectedUid?: string,
 ) {
   const token = await getToken();
-  if (expectedUid && (await readSession())?.user.uid !== expectedUid)
+  const current = expectedUid ? await readSession() : null;
+  if (expectedUid && (current?.user.uid !== expectedUid || current?.token !== token))
     throw Object.assign(new Error("Sign in to sync your workout."), { status: 401 });
   if (!token) throw new Error("Please sign in with your CheFu account.");
   const headers = new Headers(options.headers);

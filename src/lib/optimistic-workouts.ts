@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { WorkoutDetail, WorkoutListItem } from "./api";
+import { optimisticWorkoutPages } from "./optimistic-workout-pages";
 
 type Change = { image: string } | { exerciseIds: string[] } | { deleted: true };
 const pending = new WeakMap<QueryClient, number>();
@@ -14,6 +15,7 @@ export async function optimisticWorkoutChange(
   change: Change,
 ) {
   await client.cancelQueries({ queryKey: ["workouts"] });
+  const paged = optimisticWorkoutPages(client, id, change);
   const undo: (() => void)[] = [];
   const queries = client.getQueryCache().findAll({ queryKey: ["workouts"] });
   const originals = new Map(
@@ -108,11 +110,13 @@ export async function optimisticWorkoutChange(
   let settled = false;
   return Object.assign(
     () => {
+      paged.rollback();
       refreshNeeded.set(client, true);
       undo.forEach((restore) => restore());
     },
     {
       confirmImage(image: string) {
+        paged.confirmImage(image);
         if (!("image" in change)) return;
         for (const query of queries) {
           if (
@@ -178,6 +182,7 @@ export async function optimisticWorkoutChange(
         }
       },
       confirmDeletion() {
+        paged.confirmDeletion();
         if (
           !("deleted" in change) ||
           !queries.some(

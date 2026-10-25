@@ -28,8 +28,8 @@ export default function MyWorkouts() {
         isError,
         isPending,
     } = useQuery({
-        queryFn: () => getWorkoutsQueryFn(),
-        queryKey: ["workouts"],
+        queryFn: () => getWorkoutsQueryFn(4),
+        queryKey: ["workouts", "recent"],
         select: (workouts) => workouts?.slice(0, 4) ?? [],
     });
 
