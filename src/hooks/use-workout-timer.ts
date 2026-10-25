@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
+import { syncRestAlert } from "@/lib/workout-reminders";
+import { showToast } from "@/lib/toast-store";
 
-export function useWorkoutTimer() {
+export function useWorkoutTimer(options?: { userId?: string; restAlerts?: boolean; sound?: boolean }) {
+  const preferences = useRef(options);
+  preferences.current = options;
+  const alertKey = useRef("");
+  if (!alertKey.current) alertKey.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [elapsed, setElapsed] = useState(0);
   const [rest, setRest] = useState(0);
@@ -11,6 +17,11 @@ export function useWorkoutTimer() {
   const lastResumeAt = useRef(Date.now());
   const isPausedRef = useRef(false);
   const restEndsAt = useRef<number | null>(null);
+
+  useEffect(() => {
+    void syncRestAlert(options?.userId, alertKey.current, options?.restAlerts ? restEndsAt.current ?? undefined : undefined, options?.sound !== false).catch(() => undefined);
+  }, [options?.userId, options?.restAlerts, options?.sound]);
+  useEffect(() => () => { void syncRestAlert(undefined, alertKey.current).catch(() => undefined); }, []);
 
   useEffect(() => {
     if (!isPaused) lastResumeAt.current = Date.now();
@@ -56,11 +67,15 @@ export function useWorkoutTimer() {
   const startRest = (seconds: number) => {
     restEndsAt.current = Date.now() + seconds * 1000;
     setRest(seconds);
+    const pref = preferences.current;
+    if (pref?.restAlerts && seconds > 0) void syncRestAlert(pref.userId, alertKey.current, restEndsAt.current, pref.sound !== false).catch(() => showToast("Unable to schedule the rest alert. The timer still works in the app."));
+    else void syncRestAlert(undefined, alertKey.current).catch(() => undefined);
   };
 
   const skipRest = () => {
     restEndsAt.current = null;
     setRest(0);
+    void syncRestAlert(undefined, alertKey.current).catch(() => undefined);
   };
 
   const restore = (snapshot: { startedAt: number; elapsed: number; paused: boolean; savedAt: number }) => {

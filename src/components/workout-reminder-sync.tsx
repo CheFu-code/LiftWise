@@ -7,6 +7,7 @@ export default function WorkoutReminderSync() {
   const { session } = useAuth();
   const uid = session?.user.uid;
   const reminder = session?.onboardingProfile?.reminder;
+  const daysKey = reminder?.days?.join(",");
   useEffect(() => {
     const sync = () => {
       void syncWorkoutReminder(uid, reminder).catch(() => {
@@ -18,7 +19,7 @@ export default function WorkoutReminderSync() {
       if (state === "active") sync();
     });
     return () => listener.remove();
-  }, [uid, reminder?.enabled, reminder?.hour, reminder?.minute]);
+  }, [uid, reminder?.enabled, reminder?.hour, reminder?.minute, daysKey, reminder?.sound, reminder?.restAlerts]);
   useEffect(() => {
     if (Platform.OS === "web") return;
     let active = true;
@@ -26,10 +27,10 @@ export default function WorkoutReminderSync() {
       .then((notifications) => {
         if (active)
           notifications.setNotificationHandler({
-            handleNotification: async () => ({
-              shouldShowBanner: true,
-              shouldShowList: true,
-              shouldPlaySound: true,
+            handleNotification: async (notification) => ({
+              shouldShowBanner: notification.request.content.data?.kind !== "rest" || AppState.currentState !== "active",
+              shouldShowList: notification.request.content.data?.kind !== "rest" || AppState.currentState !== "active",
+              shouldPlaySound: notification.request.content.data?.audible !== false && (notification.request.content.data?.kind !== "rest" || AppState.currentState !== "active"),
               shouldSetBadge: false,
             }),
           });

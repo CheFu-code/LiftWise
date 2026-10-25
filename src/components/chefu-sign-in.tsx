@@ -13,6 +13,7 @@ import {
     View,
 } from "react-native";
 import Pressable from "@/components/ui/guarded-pressable";
+import { Feather } from "@expo/vector-icons";
 
 export default function ChefuSignIn({
     register = false,
@@ -202,6 +203,16 @@ export default function ChefuSignIn({
                                           ? "Create account"
                                           : "Sign in"}
                                 </Text>
+                                {!isAuthenticating && (
+                                    <Feather
+                                        name="external-link"
+                                        size={17}
+                                        color={primaryForeground}
+                                        style={styles.icon}
+                                        accessible={false}
+                                        importantForAccessibility="no"
+                                    />
+                                )}
                             </Pressable>
                             <Text
                                 style={[styles.browserNote, { color: muted }]}
@@ -369,4 +380,5 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
     dimmed: { opacity: 0.65 },
+    icon: { flexShrink: 0 },
 });

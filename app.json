@@ -1,77 +1,81 @@
 {
-    "expo": {
-        "name": "LiftWise",
-        "slug": "liftwise",
-        "version": "1.0.0",
-        "orientation": "portrait",
-        "icon": "./assets/images/icon.png",
-        "scheme": "liftwise",
-        "userInterfaceStyle": "automatic",
-        "ios": {
-            "bundleIdentifier": "co.za.chefu.liftwise",
-            "icon": "./assets/images/icon.png",
-            "config": {
-                "usesNonExemptEncryption": false
-            }
-        },
-        "android": {
-            "adaptiveIcon": {
-                "backgroundColor": "#2563EB",
-                "foregroundImage": "./assets/images/android-icon-foreground.png",
-                "monochromeImage": "./assets/images/android-icon-monochrome.png"
-            },
-            "predictiveBackGestureEnabled": false,
-            "package": "co.za.chefu.liftwise"
-        },
-        "web": {
-            "bundler": "metro",
-            "output": "static",
-            "favicon": "./assets/images/favicon.png"
-        },
-        "plugins": [
-            "expo-notifications",
-            "expo-quick-actions",
-            "expo-router",
-            [
-                "expo-splash-screen",
-                {
-                    "backgroundColor": "#2563EB",
-                    "image": "./assets/images/splash-logo-white.png",
-                    "imageWidth": 280,
-                    "resizeMode": "contain"
-                }
-            ],
-            [
-                "expo-image-picker",
-                {
-                    "photosPermission": "Allow LiftWise to access your photos so you can choose a workout cover.",
-                    "microphonePermission": false
-                }
-            ],
-            [
-                "@sentry/react-native/expo",
-                {
-                    "url": "https://sentry.io/",
-                    "project": "liftwise",
-                    "organization": "chefu-technologies"
-                }
-            ]
-        ],
-        "experiments": {
-            "typedRoutes": true,
-            "reactCompiler": true
-        },
-        "extra": {
-            "router": {},
-            "eas": {
-                "projectId": "d38fadc2-39f0-4038-b6f9-69e689e9544c"
-            }
-        },
-        "runtimeVersion": {
-            "policy": "appVersion"
-        },
-        "updates": {
-            "url": "https://u.expo.dev/d38fadc2-39f0-4038-b6f9-69e689e9544c"
+  "expo": {
+    "name": "LiftWise",
+    "slug": "liftwise",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "liftwise",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "co.za.chefu.liftwise",
+      "icon": "./assets/images/icon.png",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#2563EB",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "co.za.chefu.liftwise",
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-quick-actions",
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#2563EB",
+          "image": "./assets/images/splash-logo-white.png",
+          "imageWidth": 280,
+          "resizeMode": "contain"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow LiftWise to access your photos so you can choose a workout cover.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "liftwise",
+          "organization": "chefu-technologies"
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d38fadc2-39f0-4038-b6f9-69e689e9544c"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d38fadc2-39f0-4038-b6f9-69e689e9544c"
     }
+  }
 }

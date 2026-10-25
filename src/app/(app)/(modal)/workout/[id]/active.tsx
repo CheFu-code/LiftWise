@@ -50,7 +50,7 @@ const ActiveSessionPage = () => {
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const saveLock = useRef(false);
     const confirmationLock = useRef(false);
-    const timer = useWorkoutTimer();
+    const timer = useWorkoutTimer({ userId: session?.user.uid, restAlerts: session?.onboardingProfile?.reminder?.restAlerts, sound: session?.onboardingProfile?.reminder?.sound });
 
     const valuesRef = useRef<
         Record<string, { reps?: string; weight?: string }>

@@ -11,7 +11,12 @@ export const onboardingValuesSchema = z.object({
       enabled: z.boolean(),
       hour: z.number().int().min(0).max(23),
       minute: z.number().int().min(0).max(59),
+      days: z.array(z.number().int().min(1).max(7)).max(7).optional(),
+      sound: z.boolean().optional(),
+      restAlerts: z.boolean().optional(),
     })
+    .refine(value => !value.days || new Set(value.days).size === value.days.length, "Duplicate training day.")
+    .refine(value => !value.enabled || !value.days || value.days.length > 0, "Choose at least one training day.")
     .optional(),
 });
 
