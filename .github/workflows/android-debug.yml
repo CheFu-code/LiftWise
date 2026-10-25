@@ -43,8 +43,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Synchronize and install dependencies
+        run: |
+          npm install --package-lock-only --no-audit --no-fund
+          npm ci --no-audit --no-fund
 
       - name: Generate Android project
         run: |
