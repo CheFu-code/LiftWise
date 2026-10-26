@@ -2,7 +2,7 @@
     "expo": {
         "name": "LiftWise",
         "slug": "liftwise",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "orientation": "portrait",
         "icon": "./assets/images/icon.png",
         "scheme": "liftwise",
@@ -22,7 +22,22 @@
             },
             "predictiveBackGestureEnabled": false,
             "package": "co.za.chefu.liftwise",
-            "permissions": ["android.permission.SCHEDULE_EXACT_ALARM"]
+            "versionCode": 2,
+            "permissions": ["android.permission.SCHEDULE_EXACT_ALARM"],
+            "intentFilters": [
+                {
+                    "action": "VIEW",
+                    "autoVerify": true,
+                    "data": [
+                        {
+                            "scheme": "https",
+                            "host": "myaccount.chefu.co.za",
+                            "pathPrefix": "/app/liftwise/"
+                        }
+                    ],
+                    "category": ["BROWSABLE", "DEFAULT"]
+                }
+            ]
         },
         "web": {
             "bundler": "metro",
@@ -79,7 +94,8 @@
             "@sentry/react-native",
             "expo-image",
             "expo-secure-store",
-            "expo-web-browser"
+            "expo-web-browser",
+            "./plugins/with-private-recents"
         ],
         "experiments": {
             "typedRoutes": true,
@@ -95,7 +111,10 @@
             "policy": "appVersion"
         },
         "updates": {
-            "url": "https://u.expo.dev/d38fadc2-39f0-4038-b6f9-69e689e9544c"
+            "enabled": true,
+            "url": "https://u.expo.dev/d38fadc2-39f0-4038-b6f9-69e689e9544c",
+            "checkAutomatically": "ON_LOAD",
+            "fallbackToCacheTimeout": 0
         }
     }
 }
