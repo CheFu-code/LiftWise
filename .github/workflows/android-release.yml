@@ -182,6 +182,24 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
+      # Configure JVM memory for production builds (16 GB public runner)
+      - name: Configure Gradle memory
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/gradle.properties")
+          lines = path.read_text().splitlines() if path.exists() else []
+          overrides = {
+              "org.gradle.jvmargs": "-Xmx6g -XX:MaxMetaspaceSize=2g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8",
+              "org.gradle.workers.max": "2",
+              "org.gradle.parallel": "false",
+              "kotlin.compiler.execution.strategy": "in-process",
+          }
+          lines = [line for line in lines if not any(line.strip().startswith(key + "=") for key in overrides)]
+          lines.extend(f"{key}={value}" for key, value in overrides.items())
+          path.write_text("\n".join(lines) + "\n")
+          PY
+
       # Build both release formats
       - name: Build release APK and AAB
         working-directory: android
