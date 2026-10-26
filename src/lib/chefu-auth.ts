@@ -36,6 +36,8 @@ let profileWritePending = false;
 let profileRevision = 0;
 let profileRefresh: {
   uid?: string;
+  token: string;
+  revision: number;
   request: Promise<
     Partial<Parameters<ChefuAuthContextValue["saveOnboardingProfile"]>[0]>
   >;
@@ -102,13 +104,11 @@ export async function saveProfile(
   }
 }
 
-async function loadOnboardingProfile() {
-  const revision = profileRevision;
-  const current = await readSession();
-  const token = await getToken();
-  if (!token) throw new Error("Please sign in again.");
-  if (!current || (await readSession())?.user.uid !== current.user.uid)
-    throw new Error("Your account changed. Please try again.");
+async function loadOnboardingProfile(
+  current: ChefuAuthSession,
+  token: string,
+  revision: number,
+) {
   const onboardingProfile = await fetchOnboardingProfile(token);
   const latest = await readSession();
   if (
@@ -116,6 +116,7 @@ async function loadOnboardingProfile() {
     latest &&
     !profileWritePending &&
     revision === profileRevision &&
+    latest.token === token &&
     latest.user.uid === current.user.uid &&
     latest.onboardingProfile === current.onboardingProfile
   )
@@ -124,11 +125,21 @@ async function loadOnboardingProfile() {
 }
 
 async function refreshOnboardingProfile() {
-  const uid = (await readSession())?.user.uid;
-  if (profileRefresh?.uid === uid && profileRefresh)
+  const token = await getToken();
+  const current = await readSession();
+  if (!token || !current || current.token !== token)
+    throw new Error("Please sign in again.");
+  const uid = current.user.uid;
+  const revision = profileRevision;
+  if (
+    profileRefresh &&
+    profileRefresh.uid === uid &&
+    profileRefresh.token === token &&
+    profileRefresh.revision === revision
+  )
     return profileRefresh.request;
-  const request = loadOnboardingProfile();
-  profileRefresh = { uid, request };
+  const request = loadOnboardingProfile(current, token, revision);
+  profileRefresh = { uid, token, revision, request };
   try {
     return await request;
   } finally {
@@ -230,13 +241,12 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
           },
           DISCOVERY,
         );
-        const next = sessionFromToken(
-          token,
-          await fetchUser(token.accessToken),
-        );
-        next.onboardingProfile = await fetchOnboardingProfile(
-          token.accessToken,
-        );
+        const [user, onboardingProfile] = await Promise.all([
+          fetchUser(token.accessToken),
+          fetchOnboardingProfile(token.accessToken),
+        ]);
+        const next = sessionFromToken(token, user);
+        next.onboardingProfile = onboardingProfile;
         await queryClient.cancelQueries();
         queryClient.clear();
         await saveSession(next);

@@ -1,5 +1,7 @@
 # Unreleased
 
+- Faster sign-in with shared profile requests.
+
 - Choose training days for workout reminders.
 - Set reminder times with the native time picker.
 - Preview your next reminder.

@@ -91,7 +91,22 @@ export function sessionFromToken(
   };
 }
 
-export async function fetchUser(token: string): Promise<ChefuUser> {
+const userReads = new Map<string, Promise<ChefuUser>>();
+// Exact-token, in-flight sharing only. A new token or settled read always
+// performs a fresh request; profile data is never used as authorization proof.
+export function fetchUser(token: string): Promise<ChefuUser> {
+  const pending = userReads.get(token);
+  if (pending) return pending;
+  const request = loadUser(token);
+  userReads.set(token, request);
+  const clear = () => {
+    if (userReads.get(token) === request) userReads.delete(token);
+  };
+  void request.then(clear, clear);
+  return request;
+}
+
+async function loadUser(token: string): Promise<ChefuUser> {
   const response = await fetch(DISCOVERY.userInfoEndpoint, {
     headers: { Authorization: `Bearer ${token}`, "x-chefu-app": "liftwise" },
   });

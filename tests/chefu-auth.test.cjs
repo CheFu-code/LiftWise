@@ -35,7 +35,7 @@ function load(file, dependencies = {}, globals = {}) {
   return module.exports;
 }
 
-function client(refreshAsync) {
+function client(refreshAsync, fetch) {
   let stored = null;
   class TokenError extends Error {
     constructor(code) {
@@ -43,19 +43,23 @@ function client(refreshAsync) {
       this.code = code;
     }
   }
-  const api = load("../src/lib/chefu-session.ts", {
-    "expo-auth-session": { refreshAsync, TokenError },
-    "react-native": { Platform: { OS: "ios" } },
-    "expo-secure-store": {
-      getItemAsync: async () => stored,
-      setItemAsync: async (_key, value) => {
-        stored = value;
-      },
-      deleteItemAsync: async () => {
-        stored = null;
+  const api = load(
+    "../src/lib/chefu-session.ts",
+    {
+      "expo-auth-session": { refreshAsync, TokenError },
+      "react-native": { Platform: { OS: "ios" } },
+      "expo-secure-store": {
+        getItemAsync: async () => stored,
+        setItemAsync: async (_key, value) => {
+          stored = value;
+        },
+        deleteItemAsync: async () => {
+          stored = null;
+        },
       },
     },
-  });
+    { fetch },
+  );
   return { api, TokenError, stored: () => stored };
 }
 const expired = () => ({
@@ -69,6 +73,45 @@ const refreshed = () => ({
   refreshToken: "refresh-new",
   issuedAt: Math.floor(Date.now() / 1000),
   expiresIn: 3600,
+});
+
+test("userinfo reads share only concurrent exact-token requests; retries and rotated tokens fetch fresh data", async () => {
+  let requests = 0;
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  let valid = true;
+  const { api } = client(
+    async () => refreshed(),
+    async (_url, options) => {
+      requests++;
+      assert.match(options.headers.Authorization, /^Bearer /);
+      await gate;
+      return {
+        ok: valid,
+        json: async () => ({
+          sub: "alice",
+          email: "alice@example.test",
+          app: "liftwise",
+        }),
+      };
+    },
+  );
+  const first = api.fetchUser("token-a");
+  const second = api.fetchUser("token-a");
+  assert.equal(first, second);
+  const rotated = api.fetchUser("token-b");
+  assert.equal(requests, 2);
+  release();
+  await Promise.all([first, second, rotated]);
+  await api.fetchUser("token-a");
+  assert.equal(requests, 3, "settled results are not authorization caches");
+  valid = false;
+  await assert.rejects(api.fetchUser("token-a"));
+  valid = true;
+  await api.fetchUser("token-a");
+  assert.equal(requests, 5, "failure does not poison the next request");
 });
 
 test("concurrent requests refresh once and persist the rotated refresh token", async () => {
@@ -236,6 +279,40 @@ test("valid callbacks exchange the verifier and registration preserves the OAuth
     new URL(url.searchParams.get("returnTo")).pathname,
     "/oauth/authorize",
   );
+});
+
+test("sign-in starts userinfo and onboarding reads together and waits for both before publishing the session", async () => {
+  let finishUser;
+  let finishProfile;
+  const { value, calls } = signInFlow(
+    {
+      type: "success",
+      params: { state: "random-state-and-nonce", code: "code" },
+    },
+    {
+      fetchUser: () =>
+        new Promise((resolve) => {
+          finishUser = resolve;
+        }),
+    },
+    {
+      fetchOnboardingProfile: () =>
+        new Promise((resolve) => {
+          finishProfile = resolve;
+        }),
+    },
+  );
+  const signingIn = value.signInWithChefuAccount();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(typeof finishUser, "function");
+  assert.equal(typeof finishProfile, "function");
+  assert.equal(calls.save, 0);
+  finishUser({ uid: "chefu-uid" });
+  await Promise.resolve();
+  assert.equal(calls.save, 0);
+  finishProfile({ gender: "female" });
+  await signingIn;
+  assert.equal(calls.save, 1);
 });
 
 test("profile refresh preserves rotated tokens and newly saved preferences", async () => {
@@ -478,4 +555,52 @@ test("changing accounts while acquiring a token cannot save preferences under th
   assert.equal(writes, 0);
   assert.equal(current.user.uid, "bob");
   assert.equal(current.onboardingProfile.weightUnit, "kg");
+});
+
+test("new tokens and saved preferences cannot join or apply an older onboarding read", async () => {
+  for (const change of ["token", "preferences"]) {
+    let current = {
+      token: "old",
+      user: { uid: "alice" },
+      onboardingProfile: completeProfile,
+    };
+    const finish = [];
+    const { value } = signInFlow(
+      {},
+      {
+        getToken: async () => current.token,
+        readSession: async () => current,
+        saveSession: async (next) => {
+          current = next;
+        },
+      },
+      {
+        fetchOnboardingProfile: () =>
+          new Promise((resolve) => finish.push(resolve)),
+        postOnboardingProfile: async () => {},
+      },
+    );
+    const old = value.refreshOnboardingProfile();
+    await flush();
+    if (change === "token") current = { ...current, token: "new" };
+    else
+      await value.saveOnboardingProfile({
+        ...completeProfile,
+        weightUnit: "lb",
+      });
+    const latest = value.refreshOnboardingProfile();
+    await flush();
+    assert.equal(finish.length, 2, change);
+    const beforeOldResponse = current;
+    finish[0]({ ...completeProfile, weightUnit: "kg" });
+    await old;
+    assert.equal(
+      current,
+      beforeOldResponse,
+      "stale response cannot publish a local profile",
+    );
+    finish[1]({ ...completeProfile, weightUnit: "lb" });
+    await latest;
+    assert.equal(current.onboardingProfile.weightUnit, "lb");
+  }
 });

@@ -13,6 +13,7 @@ import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import WeekCalendar from "@/components/week-calendar";
 import { useStreak } from "@/contexts/streak-context";
 import { useAppThemeColor } from "@/theme/app-theme";
+import { StreakSkeleton } from "@/components/skeleton/streak-skeleton-loader";
 
 const logo = require("../../../../assets/images/app-images/logo.png");
 const streakIcon = require("../../../../assets/images/app-images/streak-icon.png");
@@ -67,19 +68,22 @@ export default function HomePage() {
                     <Pressable
                         className="h-11 flex-row items-center rounded-full border border-border bg-card px-3 active:bg-muted"
                         onPress={showStreak}
+                        disabled={streakPending}
+                        accessibilityState={{ busy: streakPending }}
                     >
                         <Image
                             className="h-6 w-6"
                             resizeMode="contain"
                             source={streakIcon}
                         />
-                        <Text className="ml-1.5 mr-0.5 font-inter-bold text-[14px] text-foreground">
-                            {streakPending
-                                ? "?"
-                                : streakError
-                                  ? "!"
-                                  : currentStreak}
-                        </Text>
+
+                        {streakPending ? (
+                            <StreakSkeleton />
+                        ) : (
+                            <Text className="ml-1.5 mr-0.5 font-inter-bold text-[14px] text-foreground">
+                                {streakError ? "!" : currentStreak}
+                            </Text>
+                        )}
                     </Pressable>
                 </View>
 

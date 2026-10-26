@@ -62,7 +62,7 @@ export function useNotificationSettings() {
                 !(await reminderPermission())
                     ? "Notifications are blocked or not enabled on this device."
                     : (await reminderScheduled())
-                      ? "Workout reminders are scheduled on this device."
+                      ? "Reminders are scheduled on this device."
                       : "Notifications are allowed. No workout reminder is scheduled.",
             );
         } catch {
