@@ -200,6 +200,25 @@ jobs:
           path.write_text("\n".join(lines) + "\n")
           PY
 
+      # Enable Android release code and resource shrinking
+      - name: Configure release shrinking
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/gradle.properties")
+          lines = path.read_text().splitlines() if path.exists() else []
+          overrides = {
+              "android.enableMinifyInReleaseBuilds": "true",
+              "android.enableShrinkResourcesInReleaseBuilds": "true",
+          }
+          lines = [
+              line for line in lines
+              if not any(line.strip().split("=", 1)[0].strip() == key for key in overrides)
+          ]
+          lines.extend(f"{key}={value}" for key, value in overrides.items())
+          path.write_text("\n".join(lines) + "\n")
+          PY
+
       # Build both release formats
       - name: Build release APK and AAB
         working-directory: android
