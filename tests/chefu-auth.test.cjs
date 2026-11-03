@@ -206,6 +206,7 @@ function signInFlow(result, sessionOverrides = {}, profileOverrides = {}) {
       useEffect() {},
       useState: (value) => [value, () => {}],
     },
+    "react-native": { Platform: { OS: "android" } },
     "@tanstack/react-query": {
       useQueryClient: () => ({ cancelQueries: async () => {}, clear() {} }),
     },
@@ -268,7 +269,10 @@ test("valid callbacks exchange the verifier and registration preserves the OAuth
   });
   await value.signInWithChefuAccount("register");
   assert.equal(calls.request.usePKCE, true);
-  assert.equal(calls.request.redirectUri, "liftwise://sso-callback");
+  assert.equal(
+    calls.request.redirectUri,
+    "https://myaccount.chefu.co.za/app/liftwise/sso-callback",
+  );
   assert.equal(calls.tokenOptions.extraParams.code_verifier, "secret-verifier");
   assert.equal(calls.save, 1);
   assert.equal(calls.savedProfile.gender, "female");

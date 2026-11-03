@@ -27,10 +27,15 @@ import {
   fetchUser,
   sessionFromToken,
 } from "./chefu-session";
+import { Platform } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
 const ACCOUNT_URL =
   process.env.EXPO_PUBLIC_ACCOUNT_APP_URL || "https://myaccount.chefu.co.za";
+const ANDROID_REDIRECT_URI =
+  "https://myaccount.chefu.co.za/app/liftwise/sso-callback";
+const NATIVE_REDIRECT_URI =
+  Platform.OS === "android" ? ANDROID_REDIRECT_URI : "liftwise://sso-callback";
 const ChefuAuthContext = createContext<ChefuAuthContextValue | null>(null);
 let profileWritePending = false;
 let profileRevision = 0;
@@ -195,7 +200,7 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
         const redirectUri = AuthSession.makeRedirectUri({
           scheme: "liftwise",
           path: "sso-callback",
-          native: "liftwise://sso-callback",
+          native: NATIVE_REDIRECT_URI,
         });
         const state = randomUUID();
         const request = new AuthSession.AuthRequest({

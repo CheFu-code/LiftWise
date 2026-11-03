@@ -38,7 +38,7 @@ export type ChefuAuthContextValue = {
   user: ChefuUser | null;
   sessionClaims?: { aud?: string };
   getToken: (
-    options?: { template?: string } | Record<string, never>,
+    options?: { template?: string; forceRefresh?: boolean } | Record<string, never>,
   ) => Promise<string | null>;
   signInWithChefuAccount: (
     mode?: "login" | "register",

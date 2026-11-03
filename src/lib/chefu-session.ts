@@ -125,15 +125,15 @@ async function loadUser(token: string): Promise<ChefuUser> {
   };
 }
 
-export async function getToken(): Promise<string | null> {
+export async function getToken(options?: { forceRefresh?: boolean }): Promise<string | null> {
   await readSession();
   if (!current) return null;
-  if (current.expiresAt > Date.now() + 60_000) return current.token;
+  if (!options?.forceRefresh && current.expiresAt > Date.now() + 60_000)
+    return current.token;
   if (refreshing) return refreshing;
   const previous = current;
   refreshing = (async () => {
     if (!previous.refreshToken) {
-      await saveSession(null);
       return null;
     }
     try {

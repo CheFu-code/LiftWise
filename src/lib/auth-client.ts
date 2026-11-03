@@ -10,25 +10,46 @@ export async function authenticatedFetch<T = unknown>(
   options: RequestInit = {},
   expectedUid?: string,
 ) {
-  const token = await getToken();
+  let token = await getToken();
   const current = expectedUid ? await readSession() : null;
-  if (expectedUid && (current?.user.uid !== expectedUid || current?.token !== token))
-    throw Object.assign(new Error("Sign in to sync your workout."), { status: 401 });
+  if (
+    expectedUid &&
+    (current?.user.uid !== expectedUid || current?.token !== token)
+  )
+    throw Object.assign(new Error("Sign in to sync your workout."), {
+      status: 401,
+    });
   if (!token) throw new Error("Please sign in with your CheFu account.");
-  const headers = new Headers(options.headers);
-  headers.set("Authorization", `Bearer ${token}`);
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  if (options.signal?.aborted) controller.abort();
-  options.signal?.addEventListener("abort", abort, { once: true });
-  const timeout = setTimeout(abort, 30_000);
-  let response: Response;
-  try {
-    response = await fetch(url, { ...options, headers, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-    options.signal?.removeEventListener("abort", abort);
+
+  const request = async (accessToken: string) => {
+    const headers = new Headers(options.headers);
+    headers.set("Authorization", `Bearer ${accessToken}`);
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (options.signal?.aborted) controller.abort();
+    options.signal?.addEventListener("abort", abort, { once: true });
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    try {
+      return await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", abort);
+    }
+  };
+
+  let response = await request(token);
+  if (response.status === 401 && (await readSession())?.token === token) {
+    const refreshedToken = await getToken({ forceRefresh: true });
+    if (refreshedToken && refreshedToken !== token) {
+      token = refreshedToken;
+      response = await request(token);
+    }
   }
+
   if (response.status === 401 && (await readSession())?.token === token)
     await saveSession(null);
   const body = await response.json().catch(() => null);
