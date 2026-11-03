@@ -10,52 +10,43 @@ import { useAuth } from "@/lib/chefu-auth";
 import { useAppThemeColor } from "@/theme/app-theme";
 
 export default function PlateCalculatorPage() {
-    const router = useRouter();
-    const { session } = useAuth();
+  const router = useRouter();
+  const { session } = useAuth();
 
-    const foreground = useAppThemeColor("foreground");
+  const foreground = useAppThemeColor("foreground");
 
-    return (
-        <SafeAreaScreen edges={["top", "bottom", "left", "right"]}>
-            <ScrollView
-                className="flex-1"
-                contentContainerClassName="gap-5 px-5 pb-12 pt-4"
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
+  return (
+    <SafeAreaScreen edges={["top", "bottom", "left", "right"]}>
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="mx-auto w-full max-w-xl gap-6 px-5 pb-10 pt-4"
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        {/* Header */}
+        <View>
+          <View className="flex-row items-center gap-3">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              onPress={() => router.back()}
+              className="h-11 w-11 items-center justify-center rounded-full bg-card"
             >
-                {/* Header */}
-                <View className="gap-3">
-                    <View className="flex-row items-center gap-3">
-                        <Pressable
-                            accessibilityRole="button"
-                            accessibilityLabel="Go back"
-                            onPress={() => router.back()}
-                            className="h-11 w-11 items-center justify-center"
-                        >
-                            <Feather
-                                name="arrow-left"
-                                size={22}
-                                color={foreground}
-                            />
-                        </Pressable>
+              <Feather name="arrow-left" size={22} color={foreground} />
+            </Pressable>
 
-                        <Text className="flex-1 font-inter-bold text-[24px] text-foreground">
-                            Plate calculator
-                        </Text>
-                    </View>
+            <Text className="flex-1 font-inter-bold text-[22px] text-foreground">
+              Plate calculator
+            </Text>
+          </View>
+        </View>
 
-                    <Text className="font-inter text-[14px] leading-6 text-muted-foreground">
-                        Calculate the right plates for your barbell and hit your
-                        target weight.
-                    </Text>
-                </View>
-
-                {/* Calculator */}
-                <PlateCalculator
-                    initialUnit={session?.onboardingProfile?.weightUnit ?? "kg"}
-                />
-            </ScrollView>
-        </SafeAreaScreen>
-    );
+        {/* Calculator */}
+        <PlateCalculator
+          initialUnit={session?.onboardingProfile?.weightUnit ?? "kg"}
+        />
+      </ScrollView>
+    </SafeAreaScreen>
+  );
 }

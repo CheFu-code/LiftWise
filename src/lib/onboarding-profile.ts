@@ -12,7 +12,14 @@ export async function fetchOnboardingProfile(
   });
   if (!response.ok)
     throw new Error("Unable to load your profile. Please try again.");
-  return onboardingValuesSchema.partial().parse((await response.json()) ?? {});
+  const profile = (await response.json()) ?? {};
+  // Legacy profiles may contain null or retired answers. Ask those required
+  // questions again while retaining the user's other saved preferences.
+  for (const field of ["gender", "goal", "experience", "ageRange", "trainingLocation"] as const) {
+    if (!onboardingValuesSchema.shape[field].safeParse(profile[field]).success)
+      delete profile[field];
+  }
+  return onboardingValuesSchema.partial().parse(profile);
 }
 
 export async function postOnboardingProfile(

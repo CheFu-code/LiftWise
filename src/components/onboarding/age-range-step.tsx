@@ -9,7 +9,6 @@ type Props = {
 const options = [
   ["under-18", "Under 18"], ["18-24", "18–24"], ["25-34", "25–34"],
   ["35-44", "35–44"], ["45-54", "45–54"], ["55-plus", "55+"],
-  ["prefer-not-to-say", "Prefer not to say"],
 ] as const;
 
 export default function AgeRangeStep({ value, onSelect }: Props) {
@@ -19,7 +18,7 @@ export default function AgeRangeStep({ value, onSelect }: Props) {
         What&apos;s your age range?
       </Text>
       <Text className="mt-2 font-inter text-[15px] leading-6 text-muted-foreground">
-        Optional. Choose not to share if you prefer.
+        Choose your age range to continue.
       </Text>
       <View className="mt-6 w-full gap-3">
         {options.map(([option, label], index) => (

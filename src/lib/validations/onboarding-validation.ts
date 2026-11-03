@@ -16,7 +16,6 @@ export const onboardingValuesSchema = z.object({
     "35-44",
     "45-54",
     "55-plus",
-    "prefer-not-to-say",
   ]),
   trainingLocation: z.enum(["home", "gym", "mixed"]),
   limitations: z.string().trim().max(500).optional(),
