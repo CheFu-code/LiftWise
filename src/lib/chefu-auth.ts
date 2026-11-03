@@ -213,6 +213,7 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
           ACCOUNT_URL,
         );
         accountUrl.searchParams.set("app", "liftwise");
+        if (mode === "login") accountUrl.searchParams.set("prompt", "select_account");
         accountUrl.searchParams.set("returnTo", authorizationUrl);
         const result = await request.promptAsync(DISCOVERY, {
           url: accountUrl.toString(),

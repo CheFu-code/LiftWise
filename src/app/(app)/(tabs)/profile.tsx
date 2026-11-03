@@ -30,8 +30,8 @@ import { onboardingValuesSchema } from "@/lib/validations/onboarding-validation"
 import { useAppThemeColor } from "@/theme/app-theme";
 
 const LEGAL_ORIGIN = "https://www.chefu.co.za";
-const PRIVACY_URL = `${LEGAL_ORIGIN}/privacy`;
-const TERMS_URL = `${LEGAL_ORIGIN}/terms`;
+const PRIVACY_URL = `${LEGAL_ORIGIN}/privacy/liftwise`;
+const TERMS_URL = `${LEGAL_ORIGIN}/terms/liftwise`;
 const MY_ACCOUNT = "https://myaccount.chefu.co.za";
 const DELETE_ACCOUNT_URL = `${MY_ACCOUNT}/account?section=security`;
 
