@@ -62,6 +62,34 @@ function client(refreshAsync, fetch) {
   );
   return { api, TokenError, stored: () => stored };
 }
+
+test("native callback links reach the callback screen with OAuth parameters intact", () => {
+  const { redirectSystemPath } = load("../src/app/+native-intent.tsx");
+  const params = "?code=test%2Bcode&state=test-state#error";
+  for (const initial of [true, false]) {
+    for (const callback of [
+      "https://myaccount.chefu.co.za/app/liftwise/sso-callback",
+      "liftwise://app/liftwise/sso-callback",
+      "liftwise:///app/liftwise/sso-callback",
+      "/app/liftwise/sso-callback",
+    ]) {
+      assert.equal(
+        redirectSystemPath({ path: callback + params, initial }),
+        "/sso-callback" + params,
+      );
+    }
+    for (const path of [
+      "liftwise://sso-callback" + params,
+      "/sso-callback" + params,
+      "/workout/123",
+      "https://other.example/app/liftwise/sso-callback" + params,
+      "liftwise://app/liftwise/other",
+      "http://[invalid",
+    ]) {
+      assert.equal(redirectSystemPath({ path, initial }), path);
+    }
+  }
+});
 const expired = () => ({
   token: "old",
   refreshToken: "refresh-old",
@@ -172,7 +200,7 @@ test("invalid refresh grants clear session; network failures preserve it for ret
   }
 });
 
-function signInFlow(result, sessionOverrides = {}, profileOverrides = {}) {
+function signInFlow(result, sessionOverrides = {}, profileOverrides = {}, platform = "android") {
   const calls = { exchange: 0, save: 0 };
   const auth = load("../src/lib/chefu-auth.ts", {
     "expo-auth-session": {
@@ -206,7 +234,7 @@ function signInFlow(result, sessionOverrides = {}, profileOverrides = {}) {
       useEffect() {},
       useState: (value) => [value, () => {}],
     },
-    "react-native": { Platform: { OS: "android" } },
+    "react-native": { Platform: { OS: platform } },
     "@tanstack/react-query": {
       useQueryClient: () => ({ cancelQueries: async () => {}, clear() {} }),
     },
@@ -273,6 +301,7 @@ test("valid callbacks exchange the verifier and registration preserves the OAuth
     calls.request.redirectUri,
     "https://myaccount.chefu.co.za/app/liftwise/sso-callback",
   );
+  assert.equal(calls.tokenOptions.redirectUri, calls.request.redirectUri);
   assert.equal(calls.tokenOptions.extraParams.code_verifier, "secret-verifier");
   assert.equal(calls.save, 1);
   assert.equal(calls.savedProfile.gender, "female");
@@ -283,6 +312,17 @@ test("valid callbacks exchange the verifier and registration preserves the OAuth
     new URL(url.searchParams.get("returnTo")).pathname,
     "/oauth/authorize",
   );
+});
+
+test("iOS retains its custom-scheme callback for authorization and token exchange", async () => {
+  const { value, calls } = signInFlow({
+    type: "success",
+    params: { state: "random-state-and-nonce", code: "code" },
+  }, {}, {}, "ios");
+  await value.signInWithChefuAccount();
+  assert.equal(calls.request.redirectUri, "liftwise://sso-callback");
+  assert.equal(calls.tokenOptions.redirectUri, calls.request.redirectUri);
+  assert.equal(calls.save, 1);
 });
 
 test("sign-in starts userinfo and onboarding reads together and waits for both before publishing the session", async () => {

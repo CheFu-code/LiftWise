@@ -32,10 +32,11 @@ import { Platform } from "react-native";
 WebBrowser.maybeCompleteAuthSession();
 const ACCOUNT_URL =
   process.env.EXPO_PUBLIC_ACCOUNT_APP_URL || "https://myaccount.chefu.co.za";
-const ANDROID_REDIRECT_URI =
-  "https://myaccount.chefu.co.za/app/liftwise/sso-callback";
+// Android uses a verified App Link to return without a custom-scheme prompt.
 const NATIVE_REDIRECT_URI =
-  Platform.OS === "android" ? ANDROID_REDIRECT_URI : "liftwise://sso-callback";
+  Platform.OS === "android"
+    ? "https://myaccount.chefu.co.za/app/liftwise/sso-callback"
+    : "liftwise://sso-callback";
 const ChefuAuthContext = createContext<ChefuAuthContextValue | null>(null);
 let profileWritePending = false;
 let profileRevision = 0;
