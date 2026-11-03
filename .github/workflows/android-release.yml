@@ -49,17 +49,16 @@ jobs:
           npm install --package-lock-only --no-audit --no-fund
           npm ci --no-audit --no-fund
 
-      # Generate native Android project if missing
+      # Sync native configuration even when an Android project already exists.
       - name: Generate Android project
         run: |
-          if [ ! -f android/gradlew ]; then
-            echo "Generating Android project..."
-            npx expo prebuild \
-              --platform android \
-              --non-interactive
-          else
-            echo "Android project already exists."
-          fi
+          npx expo prebuild \
+            --platform android \
+            --non-interactive \
+            --no-install
+
+      - name: Verify Android OTA configuration
+        run: node scripts/verify-android-updates.cjs
 
       # Gradle cache only after native generation
       - name: Setup Gradle
