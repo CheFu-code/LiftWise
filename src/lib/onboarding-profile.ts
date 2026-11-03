@@ -24,7 +24,18 @@ export async function postOnboardingProfile(
   const patch =
     previous && onboardingValuesSchema.safeParse(previous).success
       ? Object.fromEntries(
-          ["goal", "experience", "weightUnit", "reminder"]
+          [
+            "goal",
+            "experience",
+            "fitnessLevel",
+            "heightCm",
+            "weight",
+            "weightUnit",
+            "ageRange",
+            "trainingLocation",
+            "limitations",
+            "reminder",
+          ]
             .filter(
               (key) =>
                 JSON.stringify(parsed[key as keyof OnboardingValues]) !==

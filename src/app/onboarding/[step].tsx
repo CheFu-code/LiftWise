@@ -8,6 +8,11 @@ import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import GenderStep from "@/components/onboarding/gender-step";
 import GoalStep from "@/components/onboarding/goal-step";
 import ExperienceStep from "@/components/onboarding/experience-step";
+import FitnessLevelStep from "@/components/onboarding/fitness-level-step";
+import HeightWeightStep from "@/components/onboarding/height-weight-step";
+import AgeRangeStep from "@/components/onboarding/age-range-step";
+import TrainingLocationStep from "@/components/onboarding/training-location-step";
+import LimitationsStep from "@/components/onboarding/limitations-step";
 import Button from "@/components/ui/button";
 import SafeAreaScreen from "@/components/ui/safe-area-screen";
 import {
@@ -106,6 +111,18 @@ export default function OnboardingStep() {
       setSaving(false);
     }
   };
+  const skip = () => {
+    if (saving || !step.optional) return;
+    if (next) {
+      router.push({
+        pathname: "/onboarding/[step]",
+        params: { step: next.key },
+      });
+    } else {
+      void goNext();
+    }
+  };
+  const hasValue = Object.prototype.hasOwnProperty.call(values, step.field);
   return (
     <SafeAreaScreen edges={["top", "bottom", "left", "right"]}>
       <ScrollView contentContainerClassName="flex-grow px-6 pb-5 pt-4">
@@ -145,8 +162,43 @@ export default function OnboardingStep() {
             {step.key === "experience" && (
               <ExperienceStep value={values.experience} onSelect={onSelect} />
             )}
+            {step.key === "fitness-level" && (
+              <FitnessLevelStep value={values.fitnessLevel} onSelect={onSelect} />
+            )}
+            {step.key === "height-weight" && (
+              <HeightWeightStep
+                height={values.heightCm}
+                weight={values.weight}
+                weightUnit={values.weightUnit}
+                onChange={(updated) => {
+                  const nextValues = { ...values, ...updated };
+                  setValues(nextValues);
+                  void saveOnboardingDraft(uid, nextValues).catch(() => undefined);
+                }}
+              />
+            )}
+            {step.key === "age-range" && (
+              <AgeRangeStep value={values.ageRange} onSelect={onSelect} />
+            )}
+            {step.key === "training-location" && (
+              <TrainingLocationStep
+                value={values.trainingLocation}
+                onSelect={onSelect}
+              />
+            )}
+            {step.key === "limitations" && (
+              <LimitationsStep
+                value={values.limitations}
+                onChange={(limitations) => onSelect(limitations)}
+              />
+            )}
+            {step.optional && !hasValue && (
+              <Button className="mt-3" onPress={skip} variant="outline">
+                Skip for now
+              </Button>
+            )}
             <Button
-              disabled={saving || !values[step.field]}
+              disabled={saving || !hasValue}
               isLoading={saving}
               onPress={goNext}
             >

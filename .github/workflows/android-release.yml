@@ -219,12 +219,11 @@ jobs:
           path.write_text("\n".join(lines) + "\n")
           PY
 
-      # Build both release formats
-      - name: Build release APK and AAB
+      # Build release
+      - name: Build release AAB
         working-directory: android
         run: |
           ./gradlew \
-            :app:assembleRelease \
             :app:bundleRelease \
             --no-daemon \
             --stacktrace
@@ -234,23 +233,11 @@ jobs:
         run: |
           mkdir -p release
 
-          cp android/app/build/outputs/apk/release/*.apk \
-            release/LiftWise-release.apk
-
           cp android/app/build/outputs/bundle/release/*.aab \
             release/LiftWise-release.aab
 
           echo "Release files:"
           ls -lh release/
-
-      # Upload APK
-      - name: Upload Release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: LiftWise-Release-APK
-          path: release/LiftWise-release.apk
-          retention-days: 30
-          if-no-files-found: error
 
       # Upload AAB
       - name: Upload Release AAB
@@ -269,7 +256,6 @@ jobs:
           echo "Both Android release formats built successfully." \
             >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Signed APK" >> "$GITHUB_STEP_SUMMARY"
           echo "- Signed AAB" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Download both from the Actions artifacts." \

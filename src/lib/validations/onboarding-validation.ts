@@ -5,7 +5,21 @@ export const onboardingValuesSchema = z.object({
   // Reuse gender values collected by other apps through the shared account.
   gender: z.string().trim().min(1).max(80),
   goal: z.enum(["build-muscle", "lose-fat", "maintain"]),
+  fitnessLevel: z.enum(["low", "moderate", "high"]).optional(),
+  heightCm: z.number().int().min(100).max(250).optional(),
+  weight: z.number().min(20).max(500).optional(),
   weightUnit: z.enum(["kg", "lb"]).optional(),
+  ageRange: z.enum([
+    "under-18",
+    "18-24",
+    "25-34",
+    "35-44",
+    "45-54",
+    "55-plus",
+    "prefer-not-to-say",
+  ]),
+  trainingLocation: z.enum(["home", "gym", "mixed"]),
+  limitations: z.string().trim().max(500).optional(),
   reminder: z
     .object({
       enabled: z.boolean(),

@@ -46,24 +46,26 @@ test("shared gender is reused and only missing app questions are asked", () => {
       .pendingOnboardingSteps({ gender: "female" })
       .map((step) => step.key)
       .join(","),
-    "goal,experience",
+    "goal,experience,age-range,training-location",
   );
   assert.equal(
     flow
       .pendingOnboardingSteps({ gender: "non-binary", goal: "maintain" })
       .map((step) => step.key)
       .join(","),
-    "experience",
+    "experience,age-range,training-location",
   );
   assert.equal(
     flow.pendingOnboardingSteps({
       gender: "female",
       goal: "maintain",
       experience: "advanced",
+      ageRange: "25-34",
+      trainingLocation: "gym",
     }).length,
     0,
   );
-  assert.equal(flow.pendingOnboardingSteps({}).length, 3);
+  assert.equal(flow.pendingOnboardingSteps({}).length, 5);
 });
 test("an account's shared answer takes precedence over a local draft", () => {
   const flow = setup();
