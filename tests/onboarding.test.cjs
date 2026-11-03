@@ -142,6 +142,7 @@ test("restored signed-in sessions remain incomplete until both new required answ
       "./onboarding-profile": {},
       "./query-persistence": {},
       "./chefu-session": {},
+      "./account-switch": {},
     }, { process: { env: {} } });
     const value = auth.ChefuAuthProvider({ children: null });
     assert.equal(value.isSignedIn, true);

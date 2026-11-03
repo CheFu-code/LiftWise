@@ -200,8 +200,8 @@ test("invalid refresh grants clear session; network failures preserve it for ret
   }
 });
 
-function signInFlow(result, sessionOverrides = {}, profileOverrides = {}, platform = "android") {
-  const calls = { exchange: 0, save: 0 };
+function signInFlow(result, sessionOverrides = {}, profileOverrides = {}, platform = "android", controls = {}) {
+  const calls = { exchange: 0, save: 0, cancel: 0, clear: 0 };
   const auth = load("../src/lib/chefu-auth.ts", {
     "expo-auth-session": {
       makeRedirectUri: (options) => options.native,
@@ -216,11 +216,12 @@ function signInFlow(result, sessionOverrides = {}, profileOverrides = {}, platfo
         }
         async promptAsync(_discovery, options) {
           calls.loginUrl = options.url;
-          return result;
+          return typeof result === "function" ? result() : result;
         }
       },
       exchangeCodeAsync: async (options) => {
         calls.exchange++;
+        if (controls.exchangeError) throw controls.exchangeError;
         calls.tokenOptions = options;
         return refreshed();
       },
@@ -236,8 +237,15 @@ function signInFlow(result, sessionOverrides = {}, profileOverrides = {}, platfo
     },
     "react-native": { Platform: { OS: platform } },
     "@tanstack/react-query": {
-      useQueryClient: () => ({ cancelQueries: async () => {}, clear() {} }),
+      useQueryClient: () => ({
+        cancelQueries: async () => { calls.cancel++; await controls.onCancel?.(); },
+        clear() { calls.clear++; },
+        isMutating: () => controls.mutations ?? 0,
+      }),
     },
+    "./account-switch": load("../src/lib/account-switch.ts", {
+      "./optimistic-workouts": { hasPendingWorkoutChanges: () => !!controls.pendingWorkouts },
+    }),
     "@/constants/onboarding": {
       getOnboardingAnswers: () => ({ success: false }),
       resetOnboardingAnswers() {},
@@ -260,12 +268,13 @@ function signInFlow(result, sessionOverrides = {}, profileOverrides = {}, platfo
       CLIENT_ID: "liftwise-mobile",
       DISCOVERY: {},
       getToken() {},
-      readSession() {},
+      readSession: async () => controls.session,
       subscribeSession() {},
       fetchUser: async () => ({ uid: "chefu-uid" }),
       sessionFromToken: () => ({ token: "new", user: { uid: "chefu-uid" } }),
       saveSession: async (session) => {
         calls.save++;
+        controls.session = session;
         calls.savedProfile = session.onboardingProfile;
       },
       ...sessionOverrides,
@@ -273,6 +282,88 @@ function signInFlow(result, sessionOverrides = {}, profileOverrides = {}, platfo
   });
   return { value: auth.ChefuAuthProvider({ children: null }), calls };
 }
+
+test("interrupted account switching preserves the existing session and workout cache", async () => {
+  const previous = { token: "alice-token", user: { uid: "alice" } };
+  for (const result of [
+    { type: "cancel" },
+    { type: "dismiss" },
+    { type: "error", params: { error: "access_denied" } },
+    { type: "success", params: { state: "tampered", code: "code" } },
+    { type: "success", params: { state: "random-state-and-nonce" } },
+  ]) {
+    const controls = { session: previous };
+    const { value, calls } = signInFlow(result, {}, {}, "android", controls);
+    await value.signInWithChefuAccount().catch(() => {});
+    assert.equal(controls.session, previous);
+    assert.equal(calls.exchange, 0);
+    assert.equal(calls.save, 0);
+    assert.equal(calls.clear, 0);
+    assert.equal(calls.cancel, 0);
+  }
+});
+
+const successfulSwitch = { type: "success", params: { state: "random-state-and-nonce", code: "code" } };
+
+test("token and profile failures leave the current account signed in and allow retry", async () => {
+  for (const failure of ["token", "user", "profile"]) {
+    const previous = { token: "alice-token", user: { uid: "alice" } };
+    const controls = { session: previous, exchangeError: failure === "token" ? new Error("Token exchange failed") : undefined };
+    let fail = true;
+    const { value, calls } = signInFlow(successfulSwitch, {
+      fetchUser: async () => {
+        if (fail && failure === "user") throw new Error("User read failed");
+        return { uid: "bob" };
+      },
+    }, {
+      fetchOnboardingProfile: async () => {
+        if (fail && failure === "profile") throw new Error("Profile read failed");
+        return { gender: "female" };
+      },
+    }, "android", controls);
+    await assert.rejects(value.signInWithChefuAccount());
+    assert.equal(controls.session, previous);
+    assert.equal(calls.clear, 0);
+    assert.equal(calls.save, 0);
+    controls.exchangeError = undefined;
+    fail = false;
+    await value.signInWithChefuAccount();
+    assert.equal(calls.save, 1);
+    assert.equal(calls.clear, 1);
+  }
+});
+
+test("switching waits for pending workout saves before opening a browser or replacing a session", async () => {
+  for (const pending of ["mutations", "pendingWorkouts"]) {
+    const previous = { token: "alice-token", user: { uid: "alice" } };
+    const controls = { session: previous, [pending]: 1 };
+    const { value, calls } = signInFlow(successfulSwitch, {}, {}, "android", controls);
+    await assert.rejects(value.signInWithChefuAccount(), /workouts are still saving/);
+    assert.equal(calls.loginUrl, undefined);
+    assert.equal(calls.save, 0);
+    assert.equal(calls.clear, 0);
+    controls[pending] = 0;
+    controls.onCancel = () => { controls[pending] = 1; };
+    await assert.rejects(value.signInWithChefuAccount(), /workouts are still saving/);
+    assert.equal(controls.session, previous);
+    assert.equal(calls.clear, 0);
+    assert.equal(calls.save, 0);
+  }
+});
+
+test("a late switching callback cannot restore a signed-out account or replace another signed-in account", async () => {
+  for (const replacement of [null, { token: "carol-token", user: { uid: "carol" } }]) {
+    const controls = { session: { token: "alice-token", user: { uid: "alice" } } };
+    const { value, calls } = signInFlow(async () => {
+      controls.session = replacement;
+      return successfulSwitch;
+    }, {}, {}, "android", controls);
+    await assert.rejects(value.signInWithChefuAccount(), /account changed/);
+    assert.equal(controls.session, replacement);
+    assert.equal(calls.clear, 0);
+    assert.equal(calls.save, 0);
+  }
+});
 
 test("cancelled or tampered callbacks cannot exchange a code or save a session", async () => {
   const cancelled = signInFlow({ type: "cancel" });

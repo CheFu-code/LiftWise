@@ -28,6 +28,7 @@ import {
   sessionFromToken,
 } from "./chefu-session";
 import { Platform } from "react-native";
+import { assertAccountSwitchReady } from "./account-switch";
 
 WebBrowser.maybeCompleteAuthSession();
 const ACCOUNT_URL =
@@ -198,6 +199,17 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
       if (isAuthenticating) return null;
       setIsAuthenticating(true);
       try {
+        const previous = await readSession();
+        const checkSwitch = async () => {
+          if ((await readSession())?.user.uid !== previous?.user.uid)
+            throw new Error("Your account changed during sign-in. Please try again.");
+          if (previous) {
+            assertAccountSwitchReady(queryClient);
+            if (profileWritePending)
+              throw new Error("Your preferences are still saving. Please wait before switching accounts.");
+          }
+        };
+        await checkSwitch();
         const redirectUri = AuthSession.makeRedirectUri({
           scheme: "liftwise",
           path: "sso-callback",
@@ -254,7 +266,9 @@ export function ChefuAuthProvider({ children }: { children: ReactNode }) {
         ]);
         const next = sessionFromToken(token, user);
         next.onboardingProfile = onboardingProfile;
+        await checkSwitch();
         await queryClient.cancelQueries();
+        await checkSwitch();
         queryClient.clear();
         await saveSession(next);
         return next.user;

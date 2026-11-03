@@ -22,7 +22,7 @@
             },
             "predictiveBackGestureEnabled": false,
             "package": "co.za.chefu.liftwise",
-            "versionCode": 2,
+            "versionCode": 3,
             "permissions": ["android.permission.SCHEDULE_EXACT_ALARM"],
             "intentFilters": [
                 {
